@@ -24,7 +24,7 @@
 \setlength{\parskip}{3pt}
 \setlength{\parindent}{0pt}
 
-\newcommand{\version}{0.4}
+\newcommand{\version}{0.5}
 \newcommand{\fecha}{27 de septiembre de 2026}
 \newcommand{\eminus}{e$^-$}
 \newcommand{\abierto}[1]{\textcolor{orange!80!black}{\textbf{[abierto]} #1}}
@@ -64,7 +64,9 @@ obtiene ruido sub-electrónico~\cite{tiffenberg2017}. Se analizaron dos conjunto
 \midrule
 Archivos & 492 FITS, 4 amplificadores c/u & 9 FITS + 9 ROOT, 4 amplificadores \\
 Geometría & CCD $6144\times1024$ px; $550\times320$ por amp., binning $\times10$ en columnas & $400\times493$ por amp., sin binning \\
-Lectura & $N=300$ muestras & $N=300$, exposición 600~s \\
+Lectura & $N=300$ muestras; 53.7~min por imagen & $N=300$, exposición 600~s \\
+Exposición & $\sim$32~min por píxel: imagen de limpieza entre imágenes científicas (inferido, ver texto) & 600~s \\
+Orientación & CCD vertical, eje $x$ hacia arriba (\cite{depaoli2024}, Fig.~2; confirmado con los muones) & horizontal (inferido de los muones) \\
 Ganancia [ADU/\eminus] & 865 / 859 / 748 / 772 & 502 / 503 / 603 / 570 \\
 Ruido [\eminus] & 0.21 / 0.19 / 0.28 / 0.26 (publicado: 0.17 en 2 de 4 cuadrantes~\cite{depaoli2024}) & 0.17 / 0.17 / 0.14 / 0.15 \\
 Masa activa & 2.217~g (publicado: 2.22~g~\cite{depaoli2024}) & --- \\
@@ -77,6 +79,16 @@ y $N=300$ coinciden con el Skipper-CCD instalado en la central Atucha~II, a 12~m
 El paper informa que sólo dos cuadrantes alcanzan 0.17~\eminus: eso concuerda con lo que medimos de forma
 independiente (amplificadores 0--1 nominales, 2--3 con $\sim$50\% más ruido). \abierto{El origen de los darks
 de 2020 no está documentado en los papers.}
+
+\textbf{Exposición y orientación.} El run 43 es posterior a los datos del paper. Sólo están las imágenes de
+RUNID impar: cada una tarda 53.7~min en leerse y entre dos consecutivas hay 10.1~min, donde va la imagen par.
+Coincide con el modo del DATA SET~B de~\cite{depaoli2024}: una lectura rápida de limpieza entre imágenes
+científicas. Un píxel leído en la fracción $f$ de la imagen se limpió en la fracción $f$ de la limpieza, así que
+su exposición es $10.1 + (53.7 - T_\mathrm{limp})\,f$~min: en promedio 32~min si toda la pausa es limpieza
+(hasta 37~min si es más corta). \abierto{Confirmar con una imagen par (debería tener $N=1$).} El paper indica
+que el conjunto está montado en vertical; en la Fig.~2 la caja del CCD cuelga con el lado largo (el eje $x$ de
+la imagen) hacia arriba. Los datos lo confirman: de los muones largos del run 43, 582 forman menos de
+15$^\circ$ con $x$ y sólo 12 más de 75$^\circ$. En los darks las direcciones no tienen preferencia.
 
 % -------------------------------------------------------------------------------------
 \section{Método}
@@ -106,11 +118,38 @@ Los depósitos puntuales se subdividen según esa convención: \emph{blob} ($>60
 \toprule
 Clase & Criterio \\
 \midrule
-Artefacto & línea de 1 fila (evento del registro serie, SRE) o de 1 columna (columna caliente) \\
+Artefacto & línea de 1 fila (evento del registro serie, SRE) o de 1 columna (columna caliente); línea \\
+ & \quad horizontal corta sin difusión vertical ($\sigma_y<0.3$~px~\cite{depaoli2024}) y sin energía de MIP \\
 Alfa & $\geq 1$~MeV en una mancha compacta ($\leq 60$~px) y redonda; el núcleo satura el ADC \\
 Puntual & largo $\leq 7$~px (difusión limitada): \emph{blob} si $E>600$~eV, \emph{difusión} si $E<600$~eV \\
 Muón & largo $\geq 30$~px, ancho/largo $\leq 0.10$, sagita/largo $\leq 0.03$ (traza recta) \\
+Muón corto & recta de 7--30~px (15--30 con binning) con la energía de una MIP que cruza los 675~$\mu$m \\
 Electrón & resto: trazas curvas o irregulares (``gusanos'', Compton, beta) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Muones cortos} (v0.5). Un muón cruza todo el espesor, así que su largo proyectado es
+$L = 45\tan\alpha$~px ($\alpha$: ángulo con la normal al CCD) y deposita la energía de una MIP a lo largo de
+$\sqrt{(15L)^2+675^2}$~$\mu$m. El corte original ($L\geq30$~px, $\alpha\geq34^\circ$) dejaba afuera, en un CCD
+horizontal, a la mitad de los muones: en los darks, las rectas cortas se clasificaban como electrones. La banda
+de energía se toma de los muones largos del mismo tipo de imagen (p5 a $1.5\times$p98): 0.126--0.57~keV/$\mu$m
+sin binning y 0.236--0.79 con binning. \abierto{La diferencia entre ambas escalas no está explicada.}
+El criterio se validó con un Monte Carlo de flujo $\propto\cos^2\theta$ con la orientación de cada CCD y el
+recorte al cuadrante (Tabla~\ref{tab:cortos}). Por debajo de 7~px (15 con binning) no se distinguen de otros
+depósitos y no se reclasifican. Una prueba independiente, el gradiente de difusión a lo largo de la traza, no
+sirvió: en los darks ni los muones largos lo muestran ($\sigma\approx0.4$--0.6~px).
+
+\begin{table}[h]
+\centering\small
+\caption{Muones por largo proyectado: regla v0.5 / predicción del MC (normalizada con $L\geq30$~px).}
+\label{tab:cortos}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Largo [px] & 7--15 & 15--30 & 30--45 & 45--60 & 60--90 & $>90$ \\
+\midrule
+Darks (CCD horizontal) & 32 / 34 & 84 / 72 & 44 / 47 & 20 / 23 & 22 / 16 & 9 / 6 \\
+Run 43, 41 imágenes (CCD vertical) & 9 / 44 & 263 / 242 & 415 / 402 & 348 / 402 & 508 / 566 & 779 / 813 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -133,14 +172,16 @@ ramas $x$, $y$, píxel, o histogramas TH2. En los 9 darks, ROOT y FITS dan idén
 \section{Resultados}
 \begin{table}[h]
 \centering\small
-\caption{Detector sobre 300 imágenes de validación no vistas (15\,434 trazas). Miden acuerdo con las reglas.}
+\caption{Detector v2 (reglas v0.5) sobre 300 imágenes de validación no vistas (15\,434 trazas). Miden acuerdo
+con las reglas. Última fila: el modelo v1 contra las mismas etiquetas.}
 \label{tab:metricas}
 \begin{tabular}{@{}lccccc@{}}
 \toprule
  & Artefacto & Muón & Electrón & Puntual & Alfa \\
 \midrule
-mAP50 & 0.97 & 0.93 & 0.89 & 0.88 & $\sim$0 (9 casos) \\
-Precisión / recall & 0.93 / 0.92 & 0.83 / 0.87 & 0.87 / 0.78 & 0.82 / 0.92 & --- \\
+mAP50 & 0.94 & 0.90 & 0.86 & 0.88 & $\sim$0 (9 casos) \\
+Precisión / recall & 0.88 / 0.89 & 0.83 / 0.82 & 0.83 / 0.78 & 0.83 / 0.92 & --- \\
+mAP50 del v1 & 0.79 & 0.86 & 0.80 & 0.88 & $\sim$0 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -167,11 +208,18 @@ puntuales y el pico de los muones en $\sim$400~keV. La línea punteada azul marc
   incidencia normal, más en trazas inclinadas).
 \end{itemize}
 
+\textbf{Detector v2 por grupo} (Tabla~\ref{tab:metricas}). De v1 a v2, la fracción llamada muón pasa del 1 al
+31\,\% en los muones cortos (446), del 88 al 87\,\% en los largos y del 0.8 al 3.1\,\% en los electrones rectos
+cortos. El 65\,\% de los muones cortos sigue saliendo como electrón: la red ve la energía por unidad de largo
+sólo de forma indirecta. Los eventos cortos del registro serie pasan de 0 a 66\,\% reconocidos como artefacto.
+
 \textbf{Composición típica} (Atucha-II, por imagen): 208 trazas, de las cuales 99 son electrones, 57 puntuales,
-44 muones y 9 artefactos. \abierto{Suponiendo exposición igual al tiempo de lectura (53~min), la tasa de
-muones resulta $\sim$10 veces menor que el flujo a nivel del mar ($\sim$1~cm$^{-2}$min$^{-1}$ sobre
-14~cm$^2$). Hipótesis: exposición efectiva menor (el nombre de archivo indica \texttt{EXP1}), blindaje de
-7--17~m.w.e., y muones casi verticales clasificados como puntuales.}
+44 muones y 9 artefactos (reglas v0.4). \textbf{Tasa de muones.} Con CCD horizontal y 53.7~min de
+exposición se esperaban $\sim$760 muones por imagen a nivel del mar ($\sim$1~cm$^{-2}$min$^{-1}$ sobre
+14.2~cm$^2$). Un plano vertical recibe la mitad del flujo ($\pi/4$ contra $\pi/2$ para $\cos^2\theta$) y la
+exposición media es $\sim$32~min, así que se esperan $\sim$230. Con las reglas v0.5 se cuentan 57 por imagen
+(50 con v0.4; 41 imágenes). \abierto{Queda un factor $\sim$4. El techo de 7--17~m.w.e.~\cite{depaoli2024}
+explica una parte, que no cuantificamos.}
 
 \textbf{Imágenes no calibradas.} Sobre un amplificador con 80 trazas en el FITS:
 \begin{itemize}
@@ -235,7 +283,11 @@ imágenes y devuelve:
 \item \textbf{Darks de 2020.} Tienen pocas imágenes sin binning, así que el método automático usa las reglas.
 \item \textbf{Formatos.} Las imágenes ROOT ya se leen; faltan los catálogos de eventos ROOT de CONNIE (clusters
   ya reconstruidos) y corregir el \emph{cross-talk} entre cuadrantes.
-\item \abierto{Resolver la tasa de muones (Sec.~3) con el tiempo de exposición real de cada imagen.}
+\item \textbf{Muones cortos en el detector.} El v2 reconoce el 31\,\% de los que marcan las reglas. Opciones:
+  revisar con la regla de energía las cajas ``electrón'' cortas del detector, o entrenar con simulaciones
+  Geant4 (generador CRY) con la orientación y el binning de cada CCD, donde se conoce la partícula real.
+\item \abierto{Tasa de muones: queda un factor $\sim$4 (Sec.~3). Falta confirmar la exposición con una imagen par
+  y cuantificar el techo de 7--17~m.w.e.}
 \end{itemize}
 
 % -------------------------------------------------------------------------------------
@@ -256,6 +308,8 @@ Fecha & Cambio \\
   configurable (225/45/15~eV); corrección de la masa activa (overscan vertical); esta bitácora. \\
 27/09/2026 & v0.4: entrada ROOT en el \emph{applet} y la línea de comandos (\texttt{skipper2root}, TTree/RNTuple
   genérico, TH2), con resultados idénticos al FITS en los 9 darks; conversor ROOT$\to$FITS; licencia MIT. \\
+27/09/2026 & v0.5: orientación (vertical) y exposición ($\sim$32~min) de Atucha-II a partir de~\cite{depaoli2024} y
+  los datos; muones cortos validados con MC $\cos^2\theta$; SRE por $\sigma_y$; detector v2 reentrenado. \\
 \bottomrule
 \end{tabularx}}
 

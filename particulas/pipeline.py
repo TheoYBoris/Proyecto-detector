@@ -7,7 +7,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .core import CLASES, EV_POR_ELECTRON, Params, calibrar_fits, clasificar, encontrar_clusters, imagen_rgb
+from .core import (CLASES, EV_POR_ELECTRON, Params, calibrar_fits, clasificar, encontrar_clusters, imagen_rgb,
+                   params_para)
 from .dibujo import dibujar
 
 # modelo ya entrenado que usa el kit listo_para_usar/
@@ -68,15 +69,9 @@ def detectar_yolo(model, amps, conf=0.25, imgsz=640, prm: Params = None):
 
 
 def detectar_reglas(amps, p: Params = Params()):
-    from dataclasses import replace
     salida = []
     for amp in amps:
-        pa = p
-        if not amp.calibrada:
-            # sin calibracion no hay energia real: cualquier mancha brillante satura la escala de
-            # pseudo-electrones. Para "alfa" se exige un nucleo saturado grande (~50 px).
-            # Un pixel suelto no se distingue del ruido de la imagen: se piden >= 3 pixeles.
-            pa = replace(p, alfa_min_energia_e=1.0e6, min_pixeles=3)
+        pa = params_para(amp, p)
         dets = []
         for c in encontrar_clusters(amp, pa):
             dets.append(dict(amp=amp.hdu, clase=clasificar(c, pa), confianza=float("nan"),

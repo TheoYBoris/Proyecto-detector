@@ -28,7 +28,9 @@ class Instrumento:
     ruido_e: float = float("nan")   # ruido de lectura publicado (e-)
     binx: int = 1                   # binning de columnas tipico (para imagenes sin encabezado)
     nsamp: int = 0                  # muestras por pixel
-    exposicion_h: float = float("nan")  # exposicion tipica por imagen (lectura continua)
+    exposicion_h: float = float("nan")  # exposicion media por pixel de cada imagen
+    nota_exposicion: str = ""       # de donde sale la exposicion (se muestra junto a las tasas)
+    orientacion: str = ""           # posicion del plano del CCD (define el largo tipico de los muones)
     referencia: str = ""
 
     def masa_g(self, filas, cols_fisicas):
@@ -39,9 +41,19 @@ class Instrumento:
 
 INSTRUMENTOS = {
     "auto": Instrumento("auto", "Automático (según el encabezado FITS)"),
+    # Exposicion: el run 43 (mar-abr 2025) tiene solo RUNID impares, 53.7 min de lectura y 10.1 min de hueco
+    # entre imagenes, donde va la imagen par: el modo de [JHEP24] con una lectura rapida de limpieza entre
+    # imagenes cientificas. Un pixel leido en la fraccion f de la imagen se limpio en la fraccion f de la
+    # limpieza: exposicion = 10.1 + (53.7 - T_limpieza) f -> media 32 min si toda la pausa es limpieza,
+    # hasta 37 min si la limpieza es mas corta. Inferido de los tiempos: confirmar con una imagen par.
     "atucha": Instrumento(
         "atucha", "Atucha-II (CNEA, 12 m del núcleo)", ruido_e=0.17, binx=10, nsamp=300,
-        exposicion_h=53 / 60, referencia="Depaoli et al., JHEP 10 (2024) 155"),
+        exposicion_h=32 / 60,
+        nota_exposicion="32 min por imagen: modo con imagen de limpieza entre imágenes científicas (run 43, "
+                        "inferido de los tiempos de lectura; rango 32–37 min). En lectura continua sería 53.7 min.",
+        orientacion="vertical, lado largo (eje x de la imagen) hacia arriba [JHEP24, Fig. 2]: los muones "
+                    "casi verticales dejan trazas largas a lo largo de x",
+        referencia="Depaoli et al., JHEP 10 (2024) 155"),
     "connie": Instrumento(
         "connie", "CONNIE (Angra 2, 30 m del núcleo)", ruido_e=0.15, binx=1, nsamp=400,
         exposicion_h=2.0, referencia="CONNIE, PRL 134 (2025) 071801; Mirthis, ICHEP 2026"),

@@ -73,13 +73,29 @@ No había etiquetas, así que el entrenamiento es en dos etapas:
 
    | clase | criterio |
    |---|---|
-   | artefacto | línea de 1 fila (registro serie) o de 1 columna |
+   | artefacto | línea de 1 fila (registro serie) o de 1 columna; o línea horizontal corta sin difusión vertical (σy < 0.3 px, corte de Atucha-II) y sin energía de muón |
    | alfa | ≥ 1 MeV en una mancha compacta (≤ 60 px) y redonda; el núcleo satura el ADC |
    | puntual | largo ≤ 7 px (depósito limitado por difusión: rayos X, baja energía) |
    | muón | largo ≥ 30 px, ancho/largo ≤ 0.10, sagita/largo ≤ 0.03 (recta) |
+   | muón corto | recta de 7–30 px (15–30 px con binning) con la energía de una MIP que cruza los 675 µm |
    | electrón | todo lo demás (trazas curvas, "gusanos" de Compton/beta) |
 
    Los umbrales están en `Params` (`particulas/core.py`).
+
+   **Muones cortos.** Un muón atraviesa todo el espesor, así que su traza mide 45·tan α píxeles (α: ángulo
+   con la normal al CCD) y deposita la energía de una MIP a lo largo de √((15 L)² + 675²) µm. La banda de
+   energía (p5 a 1.5×p98 de los muones largos del mismo tipo de imagen) es 0.126–0.57 keV/µm sin binning y
+   0.236–0.79 con binning; la diferencia entre ambas escalas es un punto abierto. El criterio se validó
+   contra un Monte Carlo con flujo ∝ cos²θ y la orientación de cada CCD. El CCD de los darks es horizontal y
+   el de Atucha-II vertical ([JHEP24], Fig. 2; confirmado porque los muones del run 43 van a lo largo de x):
+
+   | largo (px) | 7–15 | 15–30 | 30–45 | 45–60 | 60–90 | 90+ |
+   |---|---|---|---|---|---|---|
+   | darks: muones con la regla / predicción MC | 32 / 34 | 84 / 72 | 44 / 47 | 20 / 23 | 22 / 16 | 9 / 6 |
+   | run 43 (41 imágenes): regla / predicción MC | 9 / 44 | 263 / 242 | 415 / 402 | 348 / 402 | 508 / 566 | 779 / 813 |
+
+   Por debajo de 7 px (y de 15 px con binning) los muones casi perpendiculares no se distinguen de otros
+   depósitos y se dejan como están.
 4. **Detector YOLO11n** (`para_entrenar/entrenar.py`), entrenado con esas etiquetas sobre imágenes de 3
    canales: log(E), E lineal de baja energía y máscara ≥ 4 e⁻. Cada amplificador es una imagen.
 
@@ -89,13 +105,29 @@ no reciba dos cajas de clases distintas.
 
 ## Resultados del modelo entrenado (validación: 300 imágenes no vistas, 15 434 trazas)
 
-| clase | mAP50 | precisión | recall |
+Modelo v2 (27/09/2026), reentrenado con las reglas que incluyen muones cortos y eventos del registro serie:
+
+| clase | mAP50 | precisión | recall | v1 contra las mismas etiquetas (mAP50) |
+|---|---|---|---|---|
+| artefacto | 0.94 | 0.88 | 0.89 | 0.79 |
+| muón | 0.90 | 0.83 | 0.82 | 0.86 |
+| electrón | 0.86 | 0.83 | 0.78 | 0.80 |
+| puntual | 0.88 | 0.83 | 0.92 | 0.88 |
+| alfa | ~0 | – | 0 (solo 9 casos) | ~0 |
+
+Por grupo de trazas, en la misma validación:
+
+| trazas | n | v1 las llama muón | v2 las llama muón |
 |---|---|---|---|
-| artefacto | 0.97 | 0.93 | 0.92 |
-| muón | 0.93 | 0.83 | 0.87 |
-| electrón | 0.89 | 0.87 | 0.78 |
-| puntual | 0.88 | 0.82 | 0.92 |
-| alfa | ~0 | – | 0 (solo 9 casos) |
+| muones cortos (< 30 px) | 446 | 1 % | 31 % |
+| muones largos | 3864 | 88 % | 87 % |
+| electrones rectos cortos | 768 | 0.8 % | 3.1 % |
+| otros electrones | 6019 | 9.2 % | 9.8 % |
+
+El reentrenamiento recupera parte de los muones cortos sin afectar a los largos, pero el 65 % de los cortos
+sigue saliendo como electrón. Son pocos en el entrenamiento y lo que los distingue es la energía por unidad de
+largo, que la red ve sólo de forma indirecta. Los eventos cortos del registro serie pasan de 0 % a 66 %
+reconocidos como artefacto. El modelo v1 queda en `salidas_anteriores/` (no versionado) y en el historial de git.
 
 Estas métricas miden el acuerdo con las reglas, no con la física real (ver limitaciones).
 Funciona bien en imágenes como las del run 43, que son el 98 % del entrenamiento.
@@ -144,8 +176,9 @@ Recomendaciones: subir la imagen cruda en vez de una figura. Si la imagen está 
   morfológicas: su "precisión" mide cuánto coincide con ellas, no con la física real. Para ir más allá:
   corregir a mano parte de las etiquetas (los `.txt` de `para_entrenar/dataset/labels` se abren en CVAT o
   Label Studio, formato YOLO) o entrenar con simulaciones (Geant4) donde se conoce la partícula real.
-- **Muón vs. electrón es ambiguo en trazas rectas cortas**: los electrones de alta energía también dejan
-  trazas casi rectas. El corte de largo ≥ 30 px es convencional.
+- **Muón vs. electrón en trazas rectas**: un electrón de alta energía que cruza todo el sensor deja la misma
+  firma que un muón (recta con energía de MIP); ninguna regla los separa. Los muones de menos de 7 px
+  (15 px con binning) no se recuperan.
 - **Alfas**: son muy pocas (45 en todo el dataset), así que el detector las aprende mal.
 - Las trazas que se cruzan sin que ninguna sea recta quedan en una sola caja.
 - La energía de trazas saturadas (alfas, muones muy horizontales en el run 43) está subestimada.

@@ -81,6 +81,7 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
         raise gr.Error("Subí al menos un archivo (FITS, ROOT, PNG, JPG, TIFF o PDF).")
     salida = tempfile.mkdtemp(prefix="particulas_")
     galeria, filas_conteo, filas_tasas, todas, errores, avisos = [], [], [], [], [], []
+    notas_exp = set()
     hubo_imagenes = False
     t0 = time.time()
     for i, f in enumerate(archivos):
@@ -132,6 +133,9 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
             exp_h = float(exposicion) if exposicion and exposicion > 0 else inst.exposicion_h
             masa = masa_amps(amps, inst)
             if exp_h == exp_h and masa > 0:
+                if not (exposicion and exposicion > 0):
+                    notas_exp.add(f"{inst.nombre.split(' (')[0]}: " + (inst.nota_exposicion or
+                                  f"{inst.exposicion_h * 60:.0f} min por imagen (valor típico publicado)."))
                 dias = exp_h / 24.0
                 t = {"Archivo": nombre, "Masa activa [g]": round(masa, 4), "Exposición [h]": round(exp_h, 3)}
                 t.update({f"{NOMBRES[c]} [ev/(g·día)]": round(cuenta.get(c, 0) / (masa * dias), 1) for c in CLASES})
@@ -181,9 +185,9 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
     if total["Blob (>600 eV)"] + total["Difusión (<600 eV)"]:
         lineas.append(f"Depósitos puntuales (convención CONNIE): **{total['Blob (>600 eV)']} blobs** (> 600 eV) y "
                       f"**{total['Difusión (<600 eV)']} de difusión** (< 600 eV; incluyen los candidatos a CEvNS).")
-    if filas_tasas and not (exposicion and exposicion > 0):
-        lineas.append("ℹ️ **Tasas:** se supuso como exposición el tiempo de lectura publicado para el instrumento "
-                      "(lectura continua). Si tus imágenes tienen otra exposición, indicala en *Opciones avanzadas*.")
+    if notas_exp:
+        lineas.append("ℹ️ **Tasas:** exposición supuesta — " + " ".join(sorted(notas_exp)) +
+                      " Si tus imágenes tienen otra exposición, indicala en *Opciones avanzadas*.")
     if avisos:
         lineas.append("ℹ️ " + "\n\nℹ️ ".join(avisos))
     if hubo_imagenes:
@@ -230,10 +234,19 @@ AYUDA = """
 - *Detector YOLO*: red neuronal entrenada sobre ~100 000 trazas.
 - *Reglas físicas*: clasificación directa por forma (largo, ancho, curvatura) y energía.
 
+**Muones cortos.** Un muón cruza los 675 µm del sensor, así que su traza mide 45·tan(ángulo) píxeles: los que
+llegan casi perpendiculares al CCD dejan trazas cortas. Una traza recta de menos de 30 px se cuenta como muón
+si su energía es la de una partícula de mínima ionización que cruza todo el espesor (7–30 px sin binning,
+15–30 px con binning; por debajo no se distinguen de otros depósitos). Las líneas horizontales cortas sin
+difusión vertical (σy < 0.3 px) y sin esa energía se cuentan como artefactos del registro serie.
+
 **Instrumento.** En *Automático* se reconoce por la geometría del CCD en el encabezado FITS. Los perfiles usan
 las especificaciones publicadas; todos son Skipper-CCD de 15 µm de píxel y 675 µm de espesor.
 - *Atucha-II* (Depaoli et al., JHEP 10 (2024) 155): 6144×1024 px, binning ×10, 300 muestras, ruido 0.17 e⁻
-  (2 de los 4 cuadrantes), 53 min de lectura por imagen.
+  (2 de los 4 cuadrantes), 53.7 min de lectura por imagen. El CCD está **vertical**, con el eje x de la imagen
+  hacia arriba: la mayoría de los muones dejan trazas largas a lo largo de x. En el run 43 hay una imagen de
+  limpieza entre imágenes científicas, así que la exposición media por píxel es ~32 min (inferido de los
+  tiempos de lectura).
 - *CONNIE* (PRL 134 (2025) 071801; Mirthis, ICHEP 2026): 1022×682 px, 400 muestras, ruido 0.15 e⁻.
 
 El perfil se usa para avisar si un amplificador tiene más ruido que el publicado, para calcular la masa

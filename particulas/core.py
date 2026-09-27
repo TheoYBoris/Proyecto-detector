@@ -16,6 +16,7 @@ from scipy import ndimage as ndi
 
 EV_POR_ELECTRON = 3.75          # energia media para crear un par e-h en Si (eV)
 PIXEL_UM = 15.0                  # tamano de pixel (um)
+ESPESOR_UM = 675.0               # espesor del sensor (um)
 
 CLASES = ["muon", "electron", "alfa", "puntual", "artefacto"]
 DESCRIPCION = {
@@ -43,6 +44,30 @@ class Params:
     alfa_max_tamano: float = 60.0       # px fisicos; un electron de 1 MeV recorre ~2 mm (>100 px)
     puntual_max_largo: float = 7.0
     artefacto_min_largo: float = 12.0
+    # --- muones cortos: casi perpendiculares al CCD. Un muon cruza los 675 um de espesor, asi que su
+    # largo proyectado es 45*tan(alfa) px y su energia la de una MIP a lo largo de sqrt((15 L)^2 + 675^2) um.
+    # Banda de energia = p5 .. 1.5*p98 de los muones largos del mismo tipo de imagen (bitacora, v0.5).
+    # Validado contra la distribucion angular cos^2 (MC): 7-30 px sin binning (darks, CCD horizontal) y
+    # 15-30 px con binning x10 (Atucha, CCD vertical); con binning, de 7 a 15 px el exceso no son muones.
+    muon_corto_min_largo: float = 7.0
+    muon_corto_min_largo_binning: float = 15.0
+    mip_kev_um: tuple = (0.126, 0.57)           # sin binning
+    mip_kev_um_binning: tuple = (0.236, 0.79)   # con binning de columnas
+    # --- eventos del registro serie: sin difusion vertical (sigma_y < 0.3, corte de Atucha-II [JHEP24])
+    sre_max_sigma_y: float = 0.3
+    usar_energia: bool = True                   # False en imagenes sin calibrar (energia no fisica)
+
+
+def params_para(amp, p: Params = None):
+    """Parametros de clasificacion para un amplificador. Sin calibracion (PNG/JPG/PDF) no hay energia
+    real: cualquier mancha brillante satura la escala de pseudo-electrones. Para "alfa" se exige un nucleo
+    saturado grande (~50 px), un pixel suelto no se distingue del ruido (>= 3 pixeles) y no se usan los
+    criterios basados en energia (muon corto, registro serie)."""
+    from dataclasses import replace
+    p = p or Params()
+    if getattr(amp, "calibrada", True):
+        return p
+    return replace(p, alfa_min_energia_e=1.0e6, min_pixeles=3, usar_energia=False)
 
 
 # ----------------------------------------------------------------------------- calibracion
@@ -182,6 +207,7 @@ class Cluster:
     cols_fis: int
     binx: int = 1
     curvatura: float = 0.0       # sagita / largo (0 = recta)
+    sigma_y: float = 1.0         # dispersion de la carga en filas (px); < 0.3 = sin difusion (registro serie)
     clase: str = ""
 
     @property
@@ -244,9 +270,17 @@ def _medir(m, e, y0, x0, amp):
     m_fis = np.repeat(m, amp.binx, axis=1) if amp.binx > 1 else m
     rect = _rectitud(m_fis) if largo > 6 else 1.0
     ys0, xs0 = ys.min(), xs.min()
+    # sigma_y de cada columna (una traza inclinada no infla la dispersion), promediada con la carga
+    sy_col, pesos = [], []
+    for xc in np.unique(xs):
+        sel = xs == xc
+        wc, yc = w[sel], ys[sel]
+        sy_col.append(np.sqrt(np.average((yc - np.average(yc, weights=wc)) ** 2, weights=wc)))
+        pesos.append(wc.sum())
+    sigma_y = float(np.average(sy_col, weights=pesos))
     return Cluster(int(y0 + ys0), int(x0 + xs0 + amp.x0), int(y0 + ys.max() + 1), int(x0 + xs.max() + 1 + amp.x0),
                    int(len(ys)), E, float(w.max()), largo, min(ancho, largo), rect,
-                   int(ys.max() - ys0 + 1), int((xs.max() - xs0 + 1) * amp.binx), amp.binx, curv)
+                   int(ys.max() - ys0 + 1), int((xs.max() - xs0 + 1) * amp.binx), amp.binx, curv, sigma_y)
 
 
 def _separar_recta(m, e, amp, p):
@@ -347,6 +381,16 @@ def clasificar(c: Cluster, p: Params = Params()):
     recto = c.curvatura <= p.muon_max_curvatura and (c.binx > 1 or c.rectitud >= p.muon_min_rectitud)
     if L >= p.muon_min_largo and W / L <= p.muon_max_ancho_rel and recto:
         return "muon"
+    if p.usar_energia and L < p.muon_min_largo:
+        lo, hi = p.mip_kev_um_binning if c.binx > 1 else p.mip_kev_um
+        kev_um = c.energia_kev / np.hypot(L * PIXEL_UM, ESPESOR_UM)
+        # linea horizontal corta sin difusion y sin energia de muon: carga del registro serie
+        if c.sigma_y < p.sre_max_sigma_y and c.filas <= 2 and kev_um < lo:
+            return "artefacto"
+        # traza recta corta con la energia de una MIP que cruza todo el espesor: muon casi perpendicular
+        min_largo = p.muon_corto_min_largo_binning if c.binx > 1 else p.muon_corto_min_largo
+        if recto and L >= min_largo and lo <= kev_um <= hi:
+            return "muon"
     return "electron"
 
 

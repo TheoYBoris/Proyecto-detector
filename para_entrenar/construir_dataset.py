@@ -20,7 +20,6 @@ import random
 import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import replace
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
@@ -29,7 +28,7 @@ sys.path.insert(0, RAIZ)
 import pandas as pd
 from PIL import Image
 
-from particulas.core import CLASES, Params, clasificar, encontrar_clusters, imagen_rgb
+from particulas.core import CLASES, clasificar, encontrar_clusters, imagen_rgb, params_para
 from particulas.imagenes import FORMATOS
 from particulas.pipeline import cargar_amps
 
@@ -76,8 +75,8 @@ def procesar(args):
         print(f"  (se omite {os.path.basename(f)}: {type(e).__name__}: {e})", flush=True)
         return filas
     for amp in amps:
-        # imagenes sin calibrar: mismas reglas que en la deteccion (ver pipeline.detectar_reglas)
-        p = Params() if amp.calibrada else replace(Params(), alfa_min_energia_e=1.0e6, min_pixeles=3)
+        # imagenes sin calibrar: mismas reglas que en la deteccion (core.params_para)
+        p = params_para(amp)
         cl = encontrar_clusters(amp, p)
         for c in cl:
             c.clase = clasificar(c, p)
