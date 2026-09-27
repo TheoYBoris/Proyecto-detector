@@ -3,7 +3,7 @@
     ..\\.venv\\Scripts\\python.exe detectar.py nueva_imagen.fits
     ..\\.venv\\Scripts\\python.exe detectar.py "carpeta/*.fits" foto.png --conf 0.3 --metodo reglas
 
-Acepta FITS de Skipper-CCD y PNG/JPG/TIFF/PDF. Para cada archivo guarda en detecciones/:
+Acepta FITS y ROOT de Skipper-CCD, y PNG/JPG/TIFF/PDF. Para cada archivo guarda en detecciones/:
     <nombre>.png   imagen con las cajas coloreadas por tipo de particula
     <nombre>.csv   una fila por traza: amplificador, clase, confianza, caja, energia (keV)
 Con --reglas tambien dibuja la clasificacion por reglas fisicas (para comparar).

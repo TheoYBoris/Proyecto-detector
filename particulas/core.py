@@ -103,11 +103,14 @@ def _estimar_ganancia(activo, sigma, default):
     return mejor[1]
 
 
-def calibrar(archivo, hdu, ganancia=None):
-    with fits.open(archivo) as f:
-        h0 = f[0].header
-        hh = f[hdu].header
-        d = f[hdu].data.astype(np.float64)
+def calibrar(archivo, hdu, ganancia=None, hdul=None):
+    """hdul: HDUList ya abierto (p.ej. un ROOT leido en memoria); si no, se abre 'archivo'."""
+    if hdul is None:
+        with fits.open(archivo) as f:
+            return calibrar(archivo, hdu, ganancia, f)
+    h0 = hdul[0].header
+    hh = hdul[hdu].header
+    d = hdul[hdu].data.astype(np.float64)
     if str(hh.get("BUNIT", "")).strip().upper() == "PSEUDO-E":
         # FITS convertido desde una imagen (particulas/imagenes.py): ya esta en pseudo-electrones
         return Amp(archivo, hdu, np.nan_to_num(d), _hint(hh, "NBINCOL", 1) or 1, 0, float("nan"),
@@ -148,10 +151,17 @@ def calibrar(archivo, hdu, ganancia=None):
     return Amp(archivo, hdu, e, binx, x0, g, sigma / g, [int(m + x0) for m in malas], filas_activas=filas)
 
 
+def abrir_hdul(archivo):
+    """FITS o ROOT (particulas/root.py) -> HDUList. Un ROOT se lee entero a memoria."""
+    from .root import es_root, leer_root
+    return leer_root(archivo) if es_root(archivo) else fits.open(archivo)
+
+
 def calibrar_fits(archivo, ganancia=None):
-    with fits.open(archivo) as f:
+    """FITS o ROOT de Skipper-CCD -> lista de Amp calibrados (uno por extension 2D)."""
+    with abrir_hdul(archivo) as f:
         idx = [i for i, x in enumerate(f) if x.data is not None and x.data.ndim == 2]
-    amps = [calibrar(archivo, i, ganancia) for i in idx]
+        amps = [calibrar(archivo, i, ganancia, f) for i in idx]
     for k, a in enumerate(amps):   # numerar amplificadores 0..n-1 aunque el primario este vacio
         a.hdu = k
     return amps

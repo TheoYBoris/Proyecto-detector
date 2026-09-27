@@ -13,11 +13,14 @@ Doble clic en `iniciar_applet.bat`, o desde esta carpeta:
 ..\.venv\Scripts\python.exe app.py --compartir  # link público temporal (*.gradio.live, dura 1 semana)
 ```
 
-En el navegador se suben uno o varios archivos (FITS, PNG, JPG, TIFF o PDF). El applet devuelve:
+En el navegador se suben uno o varios archivos (FITS, ROOT, PNG, JPG, TIFF o PDF). El applet devuelve:
 - Cada imagen con las trazas encerradas e identificadas.
 - Una tabla con el conteo por partícula y por archivo, más el total.
 - Un gráfico de barras con los totales.
 - Un ZIP con las imágenes, los CSV de detecciones y los FITS convertidos.
+
+Los **ROOT** (formato `skipper2root`, TTree/RNTuple con x, y, pix, o histogramas TH2) se calibran igual que
+un FITS y dan la misma clasificación y energía. El ZIP incluye además cada ROOT convertido a FITS.
 
 Además, a partir de las especificaciones publicadas del instrumental (ver `docs/bitacora/`), el applet:
 - **Reconoce el instrumento** por el encabezado FITS (Atucha-II, CONNIE o genérico). Avisa si un amplificador
@@ -38,11 +41,12 @@ Además, a partir de las especificaciones publicadas del instrumental (ver `docs
 ## Línea de comandos
 
 ```powershell
-# detectar (FITS o imágenes); guarda PNG + CSV en detecciones\
-..\.venv\Scripts\python.exe detectar.py nueva.fits "otra_carpeta\*.png" --metodo auto
+# detectar (FITS, ROOT o imágenes); guarda PNG + CSV en detecciones\
+..\.venv\Scripts\python.exe detectar.py nueva.fits datos.root "otra_carpeta\*.png" --metodo auto
 
-# convertir PNG/JPG/TIFF/PDF a FITS de pseudo-electrones (sin detectar)
+# convertir a FITS sin detectar: ROOT -> mismos ADU y encabezados; imagen -> pseudo-electrones
 ..\.venv\Scripts\python.exe convertir_a_fits.py figura.pdf --out convertidos
+..\.venv\Scripts\python.exe convertir_a_fits.py "..\..\datos\201211\*.root"
 ```
 
 Métodos: `auto` (YOLO en imágenes con binning, reglas físicas sin binning), `yolo` o `reglas`.

@@ -53,7 +53,8 @@ def detectar_instrumento(archivo):
     """Reconoce el instrumento por la geometria del CCD en el encabezado. 'generico' si no coincide."""
     try:
         from astropy.io import fits
-        h = fits.getheader(archivo, 0)
+        from .root import es_root, leer_encabezado_root
+        h = leer_encabezado_root(archivo) if es_root(archivo) else fits.getheader(archivo, 0)
         ncol, nrow = int(str(h.get("CCDNCOL", 0)).strip()), int(str(h.get("CCDNROW", 0)).strip())
         nsamp = int(str(h.get("NSAMP", 0)).strip())
     except Exception:

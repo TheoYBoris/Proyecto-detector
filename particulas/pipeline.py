@@ -87,7 +87,7 @@ def detectar_reglas(amps, p: Params = Params()):
 
 
 def cargar_amps(ruta, ganancia=None, escala=1.0, binx=1, paneles=True):
-    """FITS (calibrado o convertido) o imagen PNG/JPG/TIFF/PDF -> lista de Amp."""
+    """FITS (calibrado o convertido), ROOT o imagen PNG/JPG/TIFF/PDF -> lista de Amp."""
     from .imagenes import cargar_imagen, es_imagen
     if es_imagen(ruta):
         return cargar_imagen(ruta, escala=escala, binx=binx, paneles=paneles)

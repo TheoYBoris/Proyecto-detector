@@ -24,8 +24,8 @@
 \setlength{\parskip}{3pt}
 \setlength{\parindent}{0pt}
 
-\newcommand{\version}{0.3}
-\newcommand{\fecha}{26 de septiembre de 2026}
+\newcommand{\version}{0.4}
+\newcommand{\fecha}{27 de septiembre de 2026}
 \newcommand{\eminus}{e$^-$}
 \newcommand{\abierto}[1]{\textcolor{orange!80!black}{\textbf{[abierto]} #1}}
 
@@ -125,6 +125,10 @@ se descartan cajas sin un depósito real y se usa NMS agnóstico a la clase.
 luminancia, recorte automático de los ejes de figuras, resta de fondo y reescalado logarítmico sobre el ruido
 de la propia imagen. La geometría se conserva, pero la energía no es física y no se informa.
 
+\textbf{Archivos ROOT.} Se leen con \texttt{uproot} y se arma en memoria el FITS equivalente: formato
+\texttt{skipper2root} (\texttt{skPixTree} + encabezados en \texttt{headerTree\_N}), TTree/RNTuple genérico con
+ramas $x$, $y$, píxel, o histogramas TH2. En los 9 darks, ROOT y FITS dan idénticas ganancias y trazas.
+
 % -------------------------------------------------------------------------------------
 \section{Resultados}
 \begin{table}[h]
@@ -180,7 +184,7 @@ muones resulta $\sim$10 veces menor que el flujo a nivel del mar ($\sim$1~cm$^{-
 \section{Herramientas desarrolladas}
 El repositorio \texttt{Proyecto-detector} se organiza en dos kits sobre una librería común (\texttt{particulas/}):
 \begin{itemize}
-\item \textbf{\texttt{listo\_para\_usar/}} --- modelo entrenado y \emph{applet} web (Gradio). Se suben FITS o
+\item \textbf{\texttt{listo\_para\_usar/}} --- modelo entrenado y \emph{applet} web (Gradio). Se suben FITS, ROOT o
 imágenes y devuelve:
   \begin{itemize}
   \item cada imagen con las trazas identificadas;
@@ -229,7 +233,8 @@ imágenes y devuelve:
 \item \textbf{Trazas cruzadas.} Hace falta una clase ``otros'' para trazas cruzadas, como en CONNIE, y
   cortes geométricos de baja energía como los de Atucha-II ($0.3<\sigma_y<1$ px)~\cite{depaoli2024}.
 \item \textbf{Darks de 2020.} Tienen pocas imágenes sin binning, así que el método automático usa las reglas.
-\item \textbf{Formatos.} Falta leer catálogos ROOT de CONNIE y corregir el \emph{cross-talk} entre cuadrantes.
+\item \textbf{Formatos.} Las imágenes ROOT ya se leen; faltan los catálogos de eventos ROOT de CONNIE (clusters
+  ya reconstruidos) y corregir el \emph{cross-talk} entre cuadrantes.
 \item \abierto{Resolver la tasa de muones (Sec.~3) con el tiempo de exposición real de cada imagen.}
 \end{itemize}
 
@@ -249,6 +254,8 @@ Fecha & Cambio \\
 26/09/2026 & v0.3: lectura de papers~\cite{depaoli2024,connie2025,mirthis2025,mirthis2026}; identificación de
   Atucha-II; perfiles de instrumento; blob/difusión; espectro con líneas del Cu; tasas por masa; umbral
   configurable (225/45/15~eV); corrección de la masa activa (overscan vertical); esta bitácora. \\
+27/09/2026 & v0.4: entrada ROOT en el \emph{applet} y la línea de comandos (\texttt{skipper2root}, TTree/RNTuple
+  genérico, TH2), con resultados idénticos al FITS en los 9 darks; conversor ROOT$\to$FITS; licencia MIT. \\
 \bottomrule
 \end{tabularx}}
 

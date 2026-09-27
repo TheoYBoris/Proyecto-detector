@@ -1,4 +1,4 @@
-"""Applet web: los usuarios suben imagenes de Skipper-CCD (FITS, o PNG/JPG/TIFF/PDF) y reciben las
+"""Applet web: los usuarios suben imagenes de Skipper-CCD (FITS, ROOT, o PNG/JPG/TIFF/PDF) y reciben las
 imagenes con cada traza identificada, mas el conteo de particulas por tipo.
 
     ..\\.venv\\Scripts\\python.exe app.py               # solo esta PC:      http://127.0.0.1:7860
@@ -25,9 +25,10 @@ from particulas.imagenes import FORMATOS, es_imagen, guardar_fits
 from particulas.instrumentos import (ENERGIA_BLOB_EV, INSTRUMENTOS, LINEAS_CU_KEV, RANGO_ALFA_MEV,
                                      detectar_instrumento, masa_amps)
 from particulas.pipeline import METODOS, MODELO_DEFAULT, cargar_modelo, guardar_figura, procesar_archivo
+from particulas.root import EXTENSIONES_ROOT, es_root, root_a_fits
 
 NOMBRES = {"muon": "Muón", "electron": "Electrón", "alfa": "Alfa", "puntual": "Puntual", "artefacto": "Artefacto"}
-EXTENSIONES = [".fits", ".fit", ".fts", ".fz", ".gz"] + sorted(FORMATOS)
+EXTENSIONES = [".fits", ".fit", ".fts", ".fz", ".gz"] + sorted(EXTENSIONES_ROOT) + sorted(FORMATOS)
 
 RUTA_MODELO = MODELO_DEFAULT
 MODELO = None
@@ -77,7 +78,7 @@ def espectro(filas, ruta_png):
 def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, instrumento, exposicion,
                       umbral_ev=225, progress=gr.Progress()):
     if not archivos:
-        raise gr.Error("Subí al menos un archivo (FITS, PNG, JPG, TIFF o PDF).")
+        raise gr.Error("Subí al menos un archivo (FITS, ROOT, PNG, JPG, TIFF o PDF).")
     salida = tempfile.mkdtemp(prefix="particulas_")
     galeria, filas_conteo, filas_tasas, todas, errores, avisos = [], [], [], [], [], []
     hubo_imagenes = False
@@ -101,7 +102,7 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
                 umbral_e=(float(umbral_ev) / (inst.ev_por_e)) if umbral_ev else None)
         except Exception as e:  # archivo corrupto, formato no reconocido, sin imagenes, etc.
             # no mostrar rutas internas del servidor: dejar solo el nombre del archivo
-            detalle = re.sub(r"'[^']*[\\/]([^'\\/]+)'", r"'\1'", str(e))
+            detalle = re.sub(r"(?:[A-Za-z]:)?[\\/](?:[^\\/\n'\"]*[\\/])+", "", str(e))
             errores.append(f"**{nombre}**: no se pudo procesar — formato no reconocido o archivo dañado "
                            f"({type(e).__name__}: {detalle[:200]})")
             continue
@@ -111,7 +112,7 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
         cuenta = pd.Series([d["clase"] for d in filas], dtype=object).value_counts()
         sub = pd.Series([d["subclase"] for d in filas if d["subclase"]], dtype=object).value_counts()
         fila = {"Archivo": nombre, "Instrumento": inst.nombre.split(" (")[0],
-                "Tipo": "Imagen (sin calibrar)" if imagen else "FITS calibrado",
+                "Tipo": "Imagen (sin calibrar)" if imagen else ("ROOT calibrado" if es_root(ruta) else "FITS calibrado"),
                 "Método": METODOS[usado].split(" (")[0], "Paneles": len(amps), "Binning": f"x{amps[0].binx}"}
         fila.update({NOMBRES[c]: int(cuenta.get(c, 0)) for c in CLASES})
         fila["Blob (>600 eV)"] = int(sub.get("blob", 0))
@@ -143,6 +144,9 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
         if imagen:
             # la imagen convertida queda disponible como FITS para usarla con el resto de las herramientas
             guardar_fits(amps, os.path.join(salida, base + "_convertido.fits"), origen=nombre)
+        elif es_root(ruta):
+            # el ROOT tambien queda como FITS (mismos ADU y encabezados) para usarlo con otras herramientas
+            root_a_fits(ruta, os.path.join(salida, base + "_convertido.fits"))
         resumen = ", ".join(f"{NOMBRES[c]}: {int(cuenta.get(c, 0))}" for c in CLASES if cuenta.get(c, 0))
         galeria.append((png, f"{nombre} — {len(filas)} trazas ({resumen})"))
 
@@ -203,6 +207,10 @@ AYUDA = """
 - **FITS de Skipper-CCD** (recomendado): una extensión por amplificador. Se calibra con el overscan y los
   encabezados `NBINCOL`, `CCDNPRES` y `CCDNCOL`. Con ganancia 0, se estima del pico de 1 electrón.
   Da la clasificación y la energía de cada traza.
+- **ROOT** (CERN): se lee el formato de `skipper2root` (árbol `skPixTree` con x, y, ohdu, pix, y los
+  encabezados en `headerTree_N`), cualquier TTree con ramas x, y y valor de píxel, o histogramas 2D (TH2).
+  Se calibra igual que un FITS y da la misma clasificación y energía. El ZIP incluye cada ROOT convertido
+  a FITS. Los TH2 y TTree sin encabezado se calibran sin overscan; si ya están en electrones, usá ganancia 1.
 - **PNG, JPG, TIFF (incluso 16 bits), BMP, WEBP y PDF**: se convierten a un mapa de *pseudo-electrones*
   (fondo y ruido medidos en la propia imagen, intensidad reescalada). La clasificación por forma funciona,
   pero **la energía no se puede medir**. De los PDF se extraen las imágenes incrustadas o, si no hay,
@@ -250,11 +258,11 @@ Las alfas son escasas en el entrenamiento, así que el detector casi no las reco
 def construir_app():
     with gr.Blocks(title="Identificador de partículas · Skipper-CCD") as app:
         gr.Markdown("# Identificador de partículas en imágenes Skipper-CCD\n"
-                    "Subí una o varias imágenes (**FITS**, o también **PNG, JPG, TIFF o PDF**). Vas a recibir cada "
+                    "Subí una o varias imágenes (**FITS** o **ROOT**, o también **PNG, JPG, TIFF o PDF**). Vas a recibir cada "
                     "imagen con las trazas encerradas e identificadas, más el conteo de partículas de cada tipo.")
         with gr.Row():
             with gr.Column(scale=1, min_width=300):
-                archivos = gr.File(label="Imágenes (FITS, PNG, JPG, TIFF, PDF)", file_count="multiple",
+                archivos = gr.File(label="Imágenes (FITS, ROOT, PNG, JPG, TIFF, PDF)", file_count="multiple",
                                    file_types=EXTENSIONES)
                 metodo = gr.Radio([(v, k) for k, v in METODOS.items()], value="auto", label="Método")
                 instrumento = gr.Dropdown([(v.nombre, k) for k, v in INSTRUMENTOS.items()], value="auto",
@@ -266,7 +274,7 @@ def construir_app():
                                      label="Binning de columnas del CCD (0 = el del instrumento)")
                 with gr.Accordion("Opciones avanzadas", open=False):
                     conf = gr.Slider(0.05, 0.9, value=0.25, step=0.05, label="Confianza mínima (solo YOLO)")
-                    ganancia = gr.Number(value=0, label="Ganancia en ADU/e⁻ para FITS (0 = automática)", minimum=0)
+                    ganancia = gr.Number(value=0, label="Ganancia en ADU/e⁻ para FITS/ROOT (0 = automática)", minimum=0)
                     exposicion = gr.Number(value=0, minimum=0,
                                            label="Exposición por imagen en horas, para las tasas (0 = la del instrumento)")
                     umbral = gr.Dropdown([("225 eV (60 e⁻) — por defecto, como el entrenamiento", 225),
@@ -280,7 +288,7 @@ def construir_app():
                 with gr.Row():
                     barras = gr.BarPlot(x="Partícula", y="Cantidad", title="Total de partículas",
                                         sort=None, height=260)
-                    descarga = gr.File(label="Descargar todo (PNG + CSV + FITS convertidos)")
+                    descarga = gr.File(label="Descargar todo (PNG + CSV + FITS convertidos desde ROOT/imágenes)")
                 conteo = gr.Dataframe(label="Conteo por archivo", interactive=False, wrap=True,
                                       headers=["Archivo", "Instrumento", "Tipo", "Método", "Paneles", "Binning"]
                                       + [NOMBRES[c] for c in CLASES]

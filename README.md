@@ -1,8 +1,8 @@
 # Identificación de partículas en imágenes Skipper-CCD
 
-Detector que recibe una imagen de un Skipper-CCD (FITS, o PNG/JPG/TIFF/PDF), encierra en una caja cada
-traza y dice qué partícula la produjo (muón, electrón, alfa, depósito puntual o artefacto), con una
-estimación de la energía depositada cuando la imagen es un FITS calibrable.
+Detector que recibe una imagen de un Skipper-CCD (FITS, ROOT, o PNG/JPG/TIFF/PDF), encierra en una caja
+cada traza y dice qué partícula la produjo (muón, electrón, alfa, depósito puntual o artefacto), con una
+estimación de la energía depositada cuando la imagen es un FITS o ROOT calibrable.
 
 ## ¿Qué carpeta uso?
 
@@ -19,7 +19,7 @@ estimación de la energía depositada cuando la imagen es un FITS calibrable.
 │   ├── modelo/detector_particulas.pt      (entrenado con ~100 000 trazas)
 │   ├── app.py, iniciar_applet.bat         applet web (Gradio)
 │   ├── detectar.py                        detección por línea de comandos
-│   └── convertir_a_fits.py                PNG/JPG/TIFF/PDF → FITS
+│   └── convertir_a_fits.py                ROOT/PNG/JPG/TIFF/PDF → FITS
 ├── para_entrenar/          KIT 2: entrenar con datos propios
 │   ├── modelo_base/yolo11n.pt             modelo sin entrenar en partículas (punto de partida)
 │   ├── revisar_etiquetas.py               paso 1: revisar las etiquetas automáticas
@@ -28,6 +28,7 @@ estimación de la energía depositada cuando la imagen es un FITS calibrable.
 ├── particulas/             librería común que usan los dos kits
 │   ├── core.py                            calibración, reconstrucción de trazas, reglas de clasificación
 │   ├── imagenes.py                        lectura de PNG/JPG/TIFF/PDF y conversión a pseudo-electrones
+│   ├── root.py                            lectura de archivos ROOT (skipper2root, TTree/RNTuple, TH2)
 │   ├── pipeline.py                        detección completa (YOLO o reglas) sobre un archivo
 │   ├── instrumentos.py                    perfiles Atucha-II / CONNIE (specs publicadas), masa, blob/difusión
 │   └── dibujo.py                          figuras con las cajas
@@ -36,7 +37,8 @@ estimación de la energía depositada cuando la imagen es un FITS calibrable.
 │   └── generar_figuras.py                 regenera las figuras y los números citados
 ├── herramientas/
 │   └── ver_imagenes.py                    visor simple de FITS/ROOT
-└── datos/                  datos crudos del experimento (no se suben al repositorio)
+├── datos/                  datos crudos del experimento (no se suben al repositorio)
+└── LICENSE                 licencia MIT
 ```
 
 ## Instalación (después de clonar)
@@ -100,6 +102,21 @@ Funciona bien en imágenes como las del run 43, que son el 98 % del entrenamient
 En los darks de 2020 (sin binning, solo 9 archivos) fragmenta las trazas largas en varias cajas.
 Por eso el método `auto` usa las reglas físicas en imágenes sin binning.
 
+## Archivos ROOT
+
+`particulas/root.py` lee el ROOT y arma en memoria el mismo FITS (una extensión por amplificador, con su
+encabezado). Así, la calibración y la detección son exactamente las de un FITS. Formatos reconocidos:
+
+| formato | contenido | calibración |
+|---|---|---|
+| `skipper2root` (estándar de Skipper-CCD) | `skPixTree` (x, y, ohdu, pix) o `skTablePixTree` (x, y, pix[n]) + encabezados en `headerTree_N` | igual que el FITS: overscan, `CCDNPRES`, `CCDNCOL`, `NBINCOL` |
+| TTree o RNTuple genérico | ramas x/col, y/row, un valor (pix/charge/val/adc/…) y opcionalmente ohdu/hdu/amp | sin encabezado: pedestal de la zona activa, sin binning |
+| histogramas 2D (TH2F/TH2D/…) | cada histograma es una imagen | como el genérico |
+
+Validación: los 9 darks de 2020 en ROOT dan las mismas ganancias y **exactamente las mismas trazas** que
+sus FITS (con reglas y con YOLO). Si un TH2 o TTree ya está en electrones, usar ganancia = 1.
+Para pasar un ROOT a FITS sin detectar: `convertir_a_fits.py archivo.root`.
+
 ## Imágenes PNG / JPG / TIFF / PDF
 
 Una imagen exportada no conserva los ADU del sensor, el overscan ni los encabezados, así que **no se puede
@@ -133,6 +150,15 @@ Recomendaciones: subir la imagen cruda en vez de una figura. Si la imagen está 
 - Las trazas que se cruzan sin que ninguna sea recta quedan en una sola caja.
 - La energía de trazas saturadas (alfas, muones muy horizontales en el run 43) está subestimada.
 - La GTX 1660 no soporta bien FP16 (AMP), así que se entrenó en FP32 con YOLO11n y batch 8.
+
+## Licencia
+
+El código de este repositorio se distribuye bajo la [licencia MIT](LICENSE).
+
+Ojo: el detector usa [Ultralytics YOLO](https://github.com/ultralytics/ultralytics), que tiene licencia
+**AGPL-3.0**. La licencia MIT cubre el código propio. Al redistribuir el conjunto (o los pesos `.pt`
+entrenados con Ultralytics), o al ofrecer el applet como servicio público, rigen además los términos de la
+AGPL-3.0 de Ultralytics, salvo que se tenga una licencia comercial de ellos.
 
 ## Entorno
 

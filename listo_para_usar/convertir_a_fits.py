@@ -1,11 +1,14 @@
-"""Convierte imagenes PNG/JPG/TIFF/BMP/WEBP o PDF a FITS de pseudo-electrones, que el resto del
-algoritmo (detectar.py, revisar_etiquetas.py, app.py) lee directamente.
+"""Convierte a FITS los archivos que no lo son, para usarlos con el resto del algoritmo (detectar.py,
+revisar_etiquetas.py, app.py) o con cualquier herramienta de FITS (ds9, astropy, ...).
 
     ..\\.venv\\Scripts\\python.exe convertir_a_fits.py foto.png
     ..\\.venv\\Scripts\\python.exe convertir_a_fits.py "figuras/*.pdf" --escala 2 --sin-paneles
+    ..\\.venv\\Scripts\\python.exe convertir_a_fits.py "datos/*.root"
 
-Importante: una imagen no conserva los ADU del sensor, asi que el FITS resultante NO esta calibrado
-(BUNIT='PSEUDO-E'). La geometria de las trazas es valida; la energia no.
+- ROOT (skipper2root, TTree x/y/pix o TH2): FITS con los mismos ADU y encabezados, una extension por
+  amplificador. Se calibra despues exactamente igual que el FITS original del run.
+- PNG/JPG/TIFF/BMP/WEBP/PDF: una imagen no conserva los ADU del sensor, asi que el FITS resultante NO esta
+  calibrado (BUNIT='PSEUDO-E'). La geometria de las trazas es valida; la energia no.
 """
 import argparse
 import glob
@@ -15,6 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from particulas.imagenes import cargar_imagen, guardar_fits
+from particulas.root import es_root, root_a_fits
 
 
 def main():
@@ -27,8 +31,12 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     for f in sorted(p for pat in a.files for p in (glob.glob(pat) or [pat])):
-        amps = cargar_imagen(f, a.escala, a.binx, paneles=not a.sin_paneles)
         dest = os.path.join(a.out, os.path.splitext(os.path.basename(f))[0] + ".fits")
+        if es_root(f):
+            root_a_fits(f, dest)
+            print(f"{f} -> {dest}  (ROOT: ADU sin calibrar)")
+            continue
+        amps = cargar_imagen(f, a.escala, a.binx, paneles=not a.sin_paneles)
         guardar_fits(amps, dest, origen=f)
         print(f"{f} -> {dest}  ({len(amps)} panel(es): {', '.join(x.etiqueta for x in amps)})")
 
