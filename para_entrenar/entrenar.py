@@ -26,6 +26,9 @@ def main():
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--salida", default=str(AQUI / "modelo_entrenado" / "detector_particulas.pt"))
+    # con cache en RAM entrena mas rapido, pero con ~2000 imagenes una PC de 16 GB se quedo sin memoria
+    ap.add_argument("--cache-ram", action="store_true", help="cargar todas las imagenes en RAM (mas rapido)")
+    ap.add_argument("--workers", type=int, default=2)
     a = ap.parse_args()
 
     if not os.path.exists(a.datos):
@@ -33,7 +36,8 @@ def main():
     model = YOLO(a.modelo)
     r = model.train(
         data=a.datos, epochs=a.epochs, batch=a.batch, imgsz=a.imgsz,
-        project=str(AQUI / "runs"), name="particulas", exist_ok=True, workers=4, max_det=500, cache="ram",
+        project=str(AQUI / "runs"), name="particulas", exist_ok=True, workers=a.workers, max_det=500,
+        cache="ram" if a.cache_ram else False,
         # Los canales codifican energia: nada de alterar color/brillo.
         hsv_h=0.0, hsv_s=0.0, hsv_v=0.0,
         # La clase depende de la longitud y forma de la traza: sin rotaciones ni escalados fuertes

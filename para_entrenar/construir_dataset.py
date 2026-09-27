@@ -101,6 +101,8 @@ def main():
                     help="carpetas o patrones (cada uno es un grupo). Por defecto: datos del experimento original")
     ap.add_argument("--out", default=os.path.join(AQUI, "dataset"))
     ap.add_argument("--val", type=float, default=0.15, help="fraccion de archivos de cada grupo para validacion")
+    # con grupos chicos (p.ej. 9 darks) un solo archivo de validacion no alcanza para ver sobreajuste
+    ap.add_argument("--val-min", type=int, default=1, help="minimo de archivos de validacion por grupo")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     a = ap.parse_args()
 
@@ -122,7 +124,7 @@ def main():
     for i, grupo in enumerate(grupos):
         rep = REPETIR_CHICO if len(grupo) < 0.1 * mayor else 1
         g = grupo[:]; random.shuffle(g)
-        nval = max(1, round(len(g) * a.val)) if len(g) > 1 else 0
+        nval = min(len(g) - 1, max(a.val_min, round(len(g) * a.val))) if len(g) > 1 else 0
         tareas += [(f, "val", a.out, 1, i) for f in g[:nval]]
         tareas += [(f, "train", a.out, rep, i) for f in g[nval:]]
     if not any(t[1] == "val" for t in tareas):

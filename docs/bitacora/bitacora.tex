@@ -301,6 +301,8 @@ imágenes y devuelve:
 \item \textbf{Muones cortos en el detector.} El v2 reconoce el 31\,\% de los que marcan las reglas. Opciones:
   revisar con la regla de energía las cajas ``electrón'' cortas del detector, o entrenar con simulaciones
   Geant4 (generador CRY) con la orientación y el binning de cada CCD, donde se conoce la partícula real.
+  Se probó sumar las trazas de los darks binneadas $\times10$ sobre fondos reales de Atucha, pero se descartó:
+  por la diferencia de escala de energía casi no quedan muones cortos, y las imágenes son mucho más densas.
 \item \abierto{Tasa de muones: queda un factor $\sim$4 (Sec.~3). Falta confirmar la exposición con una imagen par
   y cuantificar el techo de 7--17~m.w.e.}
 \end{itemize}

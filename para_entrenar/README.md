@@ -27,7 +27,8 @@ otro espesor, otro ruido), cambia los umbrales en `Params` (`particulas/core.py`
 
 - Cada `--datos` es un **grupo**: una carpeta o un patrón con comodines. Acepta FITS de Skipper-CCD y
   también PNG/JPG/TIFF/PDF (sin calibrar).
-- De cada grupo se separa un 15 % de los archivos para validación.
+- De cada grupo se separa un 15 % de los archivos para validación (`--val-min 2` fuerza al menos 2 archivos
+  por grupo: con grupos chicos, un solo archivo no alcanza para detectar sobreajuste).
 - Los grupos chicos (menos del 10 % del más grande) se repiten ×4 en train, y las imágenes con alfas ×8.
 - Sin `--datos` se usan los datos del experimento original (`../datos/`).
 
@@ -43,6 +44,8 @@ Label Studio antes de entrenar, y así el modelo aprende de etiquetas mejores qu
 - Con una GPU de 6 GB se usa `--batch 8`, y tarda ~1.5 h con ~2000 imágenes. Con más memoria se puede
   subir `--batch`.
 - Sin GPU funciona en CPU, pero mucho más lento.
+- `--cache-ram` carga todas las imágenes en memoria y entrena más rápido, pero con ~2000 imágenes una PC de
+  16 GB se quedó sin memoria. Por defecto las lee del disco.
 - Las métricas y curvas quedan en `runs/particulas/`.
 
 Resultado: `modelo_entrenado/detector_particulas.pt`.
