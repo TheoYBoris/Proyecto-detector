@@ -29,6 +29,7 @@ def main():
     # con cache en RAM entrena mas rapido, pero con ~2000 imagenes una PC de 16 GB se quedo sin memoria
     ap.add_argument("--cache-ram", action="store_true", help="cargar todas las imagenes en RAM (mas rapido)")
     ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--runs", default=str(AQUI / "runs"), help="carpeta donde quedan metricas y curvas")
     a = ap.parse_args()
 
     if not os.path.exists(a.datos):
@@ -36,7 +37,7 @@ def main():
     model = YOLO(a.modelo)
     r = model.train(
         data=a.datos, epochs=a.epochs, batch=a.batch, imgsz=a.imgsz,
-        project=str(AQUI / "runs"), name="particulas", exist_ok=True, workers=a.workers, max_det=500,
+        project=str(Path(a.runs).resolve()), name="particulas", exist_ok=True, workers=a.workers, max_det=500,
         cache="ram" if a.cache_ram else False,
         # Los canales codifican energia: nada de alterar color/brillo.
         hsv_h=0.0, hsv_s=0.0, hsv_v=0.0,

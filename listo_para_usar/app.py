@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import tempfile
+import threading
 import time
 import zipfile
 
@@ -19,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import gradio as gr
 import pandas as pd
 
-from particulas.core import CLASES, DESCRIPCION
+from particulas.core import CLASES, DESCRIPCION, Params, cargar_criterios
 from particulas.dibujo import COLORES
 from particulas.imagenes import FORMATOS, es_imagen, guardar_fits
 from particulas.instrumentos import (ENERGIA_BLOB_EV, INSTRUMENTOS, LINEAS_CU_KEV, RANGO_ALFA_MEV,
@@ -31,13 +32,23 @@ NOMBRES = {"muon": "Muón", "electron": "Electrón", "alfa": "Alfa", "puntual": 
 EXTENSIONES = [".fits", ".fit", ".fts", ".fz", ".gz"] + sorted(EXTENSIONES_ROOT) + sorted(FORMATOS)
 
 RUTA_MODELO = MODELO_DEFAULT
+CRITERIOS = None          # Params de la reconstruccion y las reglas (--criterios); None = los del proyecto
+NOTA_CONFIG = ""          # se muestra bajo el titulo cuando el modelo o los criterios no son los del proyecto
 MODELO = None
+_CANDADO = threading.Lock()
 
 
 def modelo():
+    """Carga el detector una sola vez. Arranca en segundo plano al abrir el applet; si alguien analiza antes
+    de que termine, espera aca."""
     global MODELO
-    if MODELO is None:
-        MODELO = cargar_modelo(RUTA_MODELO)
+    with _CANDADO:
+        if MODELO is None:
+            import numpy as np
+            m = cargar_modelo(RUTA_MODELO)
+            # la primera prediccion inicializa la GPU (~3 s): mejor hacerla antes que el primer usuario
+            m.predict(np.zeros((64, 64, 3), np.uint8), verbose=False)
+            MODELO = m
     return MODELO
 
 
@@ -76,7 +87,7 @@ def espectro(filas, ruta_png):
 
 
 def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, instrumento, exposicion,
-                      umbral_ev=225, progress=gr.Progress()):
+                      umbral_ev=0, progress=gr.Progress()):
     if not archivos:
         raise gr.Error("Subí al menos un archivo (FITS, ROOT, PNG, JPG, TIFF o PDF).")
     salida = tempfile.mkdtemp(prefix="particulas_")
@@ -100,7 +111,7 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, i
                 ruta, metodo, modelo() if metodo != "reglas" else None, conf,
                 ganancia if ganancia and ganancia > 0 else None,
                 escala=float(escala or 1.0), binx=bx, paneles=bool(paneles),
-                umbral_e=(float(umbral_ev) / (inst.ev_por_e)) if umbral_ev else None)
+                umbral_e=(float(umbral_ev) / (inst.ev_por_e)) if umbral_ev else None, criterios=CRITERIOS)
         except Exception as e:  # archivo corrupto, formato no reconocido, sin imagenes, etc.
             # no mostrar rutas internas del servidor: dejar solo el nombre del archivo
             detalle = re.sub(r"(?:[A-Za-z]:)?[\\/](?:[^\\/\n'\"]*[\\/])+", "", str(e))
@@ -274,7 +285,8 @@ def construir_app():
     with gr.Blocks(title="Identificador de partículas · Skipper-CCD") as app:
         gr.Markdown("# Identificador de partículas en imágenes Skipper-CCD\n"
                     "Subí una o varias imágenes (**FITS** o **ROOT**, o también **PNG, JPG, TIFF o PDF**). Vas a recibir cada "
-                    "imagen con las trazas encerradas e identificadas, más el conteo de partículas de cada tipo.")
+                    "imagen con las trazas encerradas e identificadas, más el conteo de partículas de cada tipo."
+                    + (f"\n\n{NOTA_CONFIG}" if NOTA_CONFIG else ""))
         with gr.Row():
             with gr.Column(scale=1, min_width=300):
                 archivos = gr.File(label="Imágenes (FITS, ROOT, PNG, JPG, TIFF, PDF)", file_count="multiple",
@@ -292,10 +304,12 @@ def construir_app():
                     ganancia = gr.Number(value=0, label="Ganancia en ADU/e⁻ para FITS/ROOT (0 = automática)", minimum=0)
                     exposicion = gr.Number(value=0, minimum=0,
                                            label="Exposición por imagen en horas, para las tasas (0 = la del instrumento)")
-                    umbral = gr.Dropdown([("225 eV (60 e⁻) — por defecto, como el entrenamiento", 225),
+                    e_min = (CRITERIOS or Params()).min_energia_e
+                    umbral = gr.Dropdown([(f"{e_min * 3.75:.0f} eV ({e_min:.0f} e⁻) — el de los criterios, como el "
+                                           "entrenamiento", 0),
                                           ("45 eV (12 e⁻) — umbral de Atucha-II (JHEP 2024)", 45),
                                           ("15 eV (4 e⁻) — umbral de CONNIE (PRL 2025)", 15)],
-                                         value=225, label="Energía mínima por evento (FITS)")
+                                         value=0, label="Energía mínima por evento (FITS)")
                 boton = gr.Button("Identificar partículas", variant="primary")
                 gr.Markdown("**Clases**\n\n" + LEYENDA)
             with gr.Column(scale=3):
@@ -324,23 +338,38 @@ def construir_app():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--puerto", type=int, default=7860)
+    ap.add_argument("--puerto", type=int, default=None,
+                    help="puerto (por defecto el primero libre desde 7860)")
     ap.add_argument("--red", action="store_true", help="aceptar conexiones de otras PCs de la red local")
     ap.add_argument("--compartir", action="store_true", help="crear un link publico temporal de Gradio")
     ap.add_argument("--modelo", default=MODELO_DEFAULT,
                     help="detector a usar (por defecto el entrenado de listo_para_usar/modelo/)")
+    ap.add_argument("--criterios", default=None,
+                    help="archivo YAML de criterios (ver para_entrenar/criterios.yaml); por defecto los del proyecto")
+    ap.add_argument("--sin-navegador", action="store_true", help="no abrir el navegador al arrancar")
     a = ap.parse_args()
-    global RUTA_MODELO
+    global RUTA_MODELO, CRITERIOS, NOTA_CONFIG
     RUTA_MODELO = os.path.abspath(a.modelo)
     if not os.path.exists(RUTA_MODELO):
         raise SystemExit(f"No existe el modelo {RUTA_MODELO}")
+    try:
+        CRITERIOS = cargar_criterios(a.criterios) if a.criterios else None
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"Error en el archivo de criterios: {e}")
     print(f"Modelo: {RUTA_MODELO}")
-    modelo()  # cargar el modelo al arrancar, no en la primera consulta
+    if a.criterios:
+        print(f"Criterios: {os.path.abspath(a.criterios)}")
+    if RUTA_MODELO != os.path.abspath(MODELO_DEFAULT) or a.criterios:
+        NOTA_CONFIG = (f"*Modelo: `{os.path.basename(os.path.dirname(RUTA_MODELO))}/{os.path.basename(RUTA_MODELO)}`"
+                       + (f" · Criterios: `{os.path.basename(a.criterios)}`" if a.criterios else "") + "*")
+    # el modelo se carga en segundo plano: la pagina aparece antes, y si alguien analiza enseguida, espera
+    threading.Thread(target=modelo, daemon=True).start()
     app = construir_app()
     # una consulta a la vez: la GPU es una sola
     app.queue(default_concurrency_limit=1)
+    # el navegador lo abre Gradio cuando el servidor ya escucha (abrirlo antes daba "conexion rechazada")
     app.launch(server_name="0.0.0.0" if a.red else "127.0.0.1", server_port=a.puerto,
-               share=a.compartir, max_file_size="500mb", theme=gr.themes.Soft())
+               inbrowser=not a.sin_navegador, share=a.compartir, max_file_size="500mb", theme=gr.themes.Soft())
 
 
 if __name__ == "__main__":

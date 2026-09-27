@@ -9,7 +9,7 @@ estimación de la energía depositada cuando la imagen es un FITS o ROOT calibra
 | quiero… | carpeta |
 |---|---|
 | identificar partículas en mis imágenes ya mismo (applet web o línea de comandos) | [`listo_para_usar/`](listo_para_usar/README.md) · modelo **entrenado** incluido |
-| entrenar el detector con mis propios datos | [`para_entrenar/`](para_entrenar/README.md) · modelo **sin entrenar** + paso a paso |
+| entrenar el detector con mis propios datos y tener mi propio applet | [`para_entrenar/`](para_entrenar/README.md) · dejar los datos en `mis_datos/` y doble clic en `ENTRENAR_CON_MIS_DATOS.bat`; criterios ajustables en `criterios.yaml` |
 | entender qué se hizo, los resultados y el estado del proyecto | [`docs/bitacora/bitacora.pdf`](docs/bitacora/bitacora.pdf) · bitácora (LaTeX) |
 
 ## Estructura
@@ -21,6 +21,10 @@ estimación de la energía depositada cuando la imagen es un FITS o ROOT calibra
 │   ├── detectar.py                        detección por línea de comandos
 │   └── convertir_a_fits.py                ROOT/PNG/JPG/TIFF/PDF → FITS
 ├── para_entrenar/          KIT 2: entrenar con datos propios
+│   ├── ENTRENAR_CON_MIS_DATOS.bat         todo en uno: mis_datos/ -> modelo -> mi_applet/
+│   ├── entrenar_todo.py                   lo que corre el .bat (revisar, dataset, entrenar, applet)
+│   ├── criterios.yaml                     criterios de reconstrucción y clasificación, explicados
+│   ├── mis_datos/                         donde cada usuario deja sus imágenes
 │   ├── modelo_base/yolo11n.pt             modelo sin entrenar en partículas (punto de partida)
 │   ├── revisar_etiquetas.py               paso 1: revisar las etiquetas automáticas
 │   ├── construir_dataset.py               paso 2: armar el dataset YOLO
@@ -80,7 +84,9 @@ No había etiquetas, así que el entrenamiento es en dos etapas:
    | muón corto | recta de 7–30 px (15–30 px con binning) con la energía de una MIP que cruza los 675 µm |
    | electrón | todo lo demás (trazas curvas, "gusanos" de Compton/beta) |
 
-   Los umbrales están en `Params` (`particulas/core.py`).
+   Los umbrales están en `Params` (`particulas/core.py`) y se pueden cambiar sin tocar código con un archivo
+   de criterios ([`para_entrenar/criterios.yaml`](para_entrenar/criterios.yaml), opción `--criterios` del
+   applet, `detectar.py` y los scripts de entrenamiento).
 
    **Muones cortos.** Un muón atraviesa todo el espesor, así que su traza mide 45·tan α píxeles (α: ángulo
    con la normal al CCD) y deposita la energía de una MIP a lo largo de √((15 L)² + 675²) µm. La banda de

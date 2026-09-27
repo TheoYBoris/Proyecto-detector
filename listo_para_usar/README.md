@@ -5,13 +5,19 @@ Identifica partículas en imágenes de Skipper-CCD con el **modelo ya entrenado*
 
 ## Applet web
 
-Doble clic en `iniciar_applet.bat`, o desde esta carpeta:
+Doble clic en `iniciar_applet.bat`. El navegador se abre solo cuando el applet está listo (unos 5 s); para
+cerrarlo, cerrar la ventana negra. También desde esta carpeta:
 
 ```powershell
 ..\.venv\Scripts\python.exe app.py              # solo esta PC:        http://127.0.0.1:7860
 ..\.venv\Scripts\python.exe app.py --red        # otras PCs de la red:  http://<IP-de-esta-PC>:7860
 ..\.venv\Scripts\python.exe app.py --compartir  # link público temporal (*.gradio.live, dura 1 semana)
+..\.venv\Scripts\python.exe app.py --criterios ..\para_entrenar\criterios.yaml   # otros criterios
 ```
+
+Si el puerto 7860 está ocupado (por ejemplo, otro applet abierto), usa el siguiente libre (7861, 7862…) y lo
+muestra en la ventana. Si el navegador dice "conexión rechazada", fijate en esa ventana la dirección correcta;
+con navegadores con VPN integrada (p. ej. Opera), la VPN puede bloquear `127.0.0.1`.
 
 En el navegador se suben uno o varios archivos (FITS, ROOT, PNG, JPG, TIFF o PDF). El applet devuelve:
 - Cada imagen con las trazas encerradas e identificadas.

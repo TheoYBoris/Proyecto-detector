@@ -1,0 +1,62 @@
+# =====================================================================================================
+#  CRITERIOS DE RECONSTRUCCION Y CLASIFICACION
+# =====================================================================================================
+#  El modelo aprende de las etiquetas que generan estas reglas: si cambias un criterio, tu modelo aprende
+#  ese criterio. El applet tambien los usa para separar las trazas y para clasificar las que la red no ve.
+#
+#  Como usarlo:
+#    - Cambia el numero despues de los dos puntos y guarda el archivo. Podes borrar las lineas que no
+#      quieras tocar: se usa el valor por defecto (el que figura aca).
+#    - Revisa el efecto antes de entrenar:   ..\.venv\Scripts\python.exe revisar_etiquetas.py mis_datos --criterios criterios.yaml
+#    - Los valores de esta plantilla son los del proyecto original (Skipper-CCD de 675 um, pixeles de 15 um).
+#
+#  Unidades: e- = electrones (3.75 eV cada uno); px = pixeles FISICOS del CCD (con binning de columnas
+#  la coordenada x se multiplica por el binning); keV/um = energia por micrometro de recorrido.
+# =====================================================================================================
+
+# ---- Sensor --------------------------------------------------------------------------------------------
+espesor_um: 675.0              # espesor del silicio (um). Define cuanto recorre un muon que lo cruza
+pixel_um: 15.0                 # tamano de pixel (um)
+
+# ---- Reconstruccion: que pixeles forman una traza --------------------------------------------------------
+semilla_e: 20.0                # una traza necesita al menos un pixel con esta carga
+crecer_e: 4.0                  # y se extiende por los pixeles vecinos que superen este valor
+min_energia_e: 60.0            # trazas con menos carga total se descartan (60 e- = 225 eV)
+min_pixeles: 1                 # trazas con menos pixeles se descartan
+
+# ---- Union de tramos de una misma traza ------------------------------------------------------------------
+#  Un muon largo puede quedar partido (columna enmascarada, carga bajo el umbral, un cruce).
+#  Se unen dos tramos rectos casi paralelos, sobre la misma recta y con un hueco chico.
+unir_colineales: true          # true / false
+union_min_largo: 10.0          # px de cada tramo
+union_min_cos: 0.995           # paralelismo: coseno del angulo entre tramos (0.995 = 5.7 grados)
+union_max_hueco: 20.0          # px de hueco (con binning se permite al menos 3 columnas)
+
+# ---- Clase MUON: traza larga y recta ---------------------------------------------------------------------
+muon_min_largo: 30.0           # px
+muon_max_ancho_rel: 0.10       # ancho / largo maximo
+muon_min_rectitud: 0.75        # distancia entre extremos / largo del recorrido (1 = recta perfecta)
+muon_max_curvatura: 0.03       # sagita / largo
+
+# ---- Muon corto: recta mas corta que muon_min_largo con la energia de una particula que cruza todo el sensor
+#  Largo proyectado = (espesor/pixel) * tan(angulo); energia por um calculada sobre sqrt((pixel*L)^2 + espesor^2).
+#  Las bandas salen de los muones largos de los datos originales: revisalas si tu sensor o tu calibracion
+#  son distintos (muones cortos reales que salen como electrones = banda mal ubicada).
+muon_corto_min_largo: 7.0              # px, imagenes sin binning
+muon_corto_min_largo_binning: 15.0     # px, imagenes con binning de columnas
+mip_kev_um: [0.126, 0.57]              # banda de energia (keV/um), sin binning
+mip_kev_um_binning: [0.236, 0.79]      # banda de energia (keV/um), con binning
+
+# ---- Clase ALFA: mancha compacta, redonda y muy energetica ------------------------------------------------
+alfa_min_energia_e: 267000.0   # e- (~1 MeV; el nucleo suele saturar el ADC, por eso es moderado)
+alfa_min_redondez: 0.5         # lado menor / lado mayor
+alfa_max_tamano: 60.0          # px
+
+# ---- Clase PUNTUAL: deposito chico --------------------------------------------------------------------------
+puntual_max_largo: 7.0         # px
+
+# ---- Clase ARTEFACTO: lineas de una fila (registro serie) o una columna (columna caliente) -----------------
+artefacto_min_largo: 12.0      # px
+sre_max_sigma_y: 0.3           # px: una linea horizontal sin difusion vertical es carga del registro serie
+
+# ---- ELECTRON: todo lo que no entra en las clases anteriores (trazas curvas o irregulares)

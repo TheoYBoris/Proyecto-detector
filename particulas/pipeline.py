@@ -27,10 +27,11 @@ def cargar_modelo(ruta=MODELO_DEFAULT):
     return YOLO(ruta)
 
 
-def params_umbral(umbral_e=None):
-    """Params con una energia minima por evento distinta (en e-). Referencias: Atucha-II trabaja desde
-    12 e- = 45 eV [JHEP24] y CONNIE desde ~15 eV [PRL25]. La semilla nunca supera el umbral."""
-    p = Params()
+def params_umbral(umbral_e=None, base: Params = None):
+    """Params (los de 'base' o los por defecto) con una energia minima por evento distinta (en e-).
+    Referencias: Atucha-II trabaja desde 12 e- = 45 eV [JHEP24] y CONNIE desde ~15 eV [PRL25].
+    La semilla nunca supera el umbral."""
+    p = base or Params()
     if umbral_e and umbral_e > 0:
         from dataclasses import replace
         p = replace(p, min_energia_e=float(umbral_e), semilla_e=min(p.semilla_e, max(2.0, float(umbral_e))))
@@ -134,13 +135,14 @@ def cargar_amps(ruta, ganancia=None, escala=1.0, binx=1, paneles=True):
 
 
 def procesar_archivo(ruta, metodo="auto", model=None, conf=0.25, ganancia=None,
-                     escala=1.0, binx=1, paneles=True, umbral_e=None):
+                     escala=1.0, binx=1, paneles=True, umbral_e=None, criterios: Params = None):
     """Devuelve (amps, detecciones por amplificador, metodo efectivamente usado).
-    umbral_e: energia minima por evento en e- (por defecto 60 e- = 225 eV)."""
+    umbral_e: energia minima por evento en e- (por defecto la de los criterios: 60 e- = 225 eV).
+    criterios: Params de la reconstruccion y las reglas (core.cargar_criterios); por defecto los del proyecto."""
     amps = cargar_amps(ruta, ganancia, escala, binx, paneles)
     if not amps:
         raise ValueError("el archivo no contiene imagenes")
-    prm = params_umbral(umbral_e)
+    prm = params_umbral(umbral_e, criterios)
     usado = metodo
     if metodo == "auto":
         # el detector se entreno casi solo con imagenes binneadas; sin binning las reglas son mas fiables

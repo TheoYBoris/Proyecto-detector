@@ -16,6 +16,10 @@ para_entrenar/dataset/
 para_entrenar/runs/
 para_entrenar/revision_etiquetas/
 para_entrenar/modelo_entrenado/
+# datos y applets de cada usuario (entrenar_todo.py)
+para_entrenar/mis_datos/*
+!para_entrenar/mis_datos/LEEME.txt
+para_entrenar/mi_applet*/
 listo_para_usar/detecciones/
 listo_para_usar/convertidos/
 salidas_anteriores/

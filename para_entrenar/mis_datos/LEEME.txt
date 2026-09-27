@@ -1,0 +1,6 @@
+Copia aca tus imagenes (FITS, ROOT, PNG, JPG, TIFF o PDF).
+
+- Podes dejarlas sueltas o en subcarpetas (una por run o por detector). Cada subcarpeta se separa por
+  su cuenta en entrenamiento y validacion, asi el modelo se evalua con imagenes de todos tus runs.
+- Despues hace doble clic en ..\ENTRENAR_CON_MIS_DATOS.bat
+- El contenido de esta carpeta no se sube al repositorio (salvo este archivo).

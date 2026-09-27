@@ -1,11 +1,13 @@
 """PASO 2 - Construye el dataset YOLO a partir de tus imagenes, auto-etiquetadas con las reglas fisicas.
 
     ..\\.venv\\Scripts\\python.exe construir_dataset.py --datos "C:/mis_datos/run1/*.fits" "C:/mis_datos/run2"
+    ..\\.venv\\Scripts\\python.exe construir_dataset.py --datos mis_datos --criterios criterios.yaml
 
-Cada --datos es un GRUPO (una carpeta o un patron con comodines). Acepta FITS de Skipper-CCD y tambien
-PNG/JPG/TIFF/PDF (sin calibrar). La separacion train/val se hace por grupo, y los grupos chicos se
+Cada --datos es un GRUPO (una carpeta o un patron con comodines). Acepta FITS y ROOT de Skipper-CCD y
+tambien PNG/JPG/TIFF/PDF (sin calibrar). La separacion train/val se hace por grupo, y los grupos chicos se
 repiten en train para que el detector no los ignore. Sin --datos se usan los del experimento original
-(datos/201211 y datos/proc_corr_proc).
+(datos/201211 y datos/proc_corr_proc). Las etiquetas salen de los criterios (--criterios; por defecto los
+del proyecto), y se guarda una copia en el dataset (criterios_usados.yaml).
 
 Cada amplificador/panel es una imagen. Salida (en para_entrenar/dataset/):
     images/{train,val}/*.png
@@ -28,23 +30,27 @@ sys.path.insert(0, RAIZ)
 import pandas as pd
 from PIL import Image
 
-from particulas.core import CLASES, clasificar, encontrar_clusters, imagen_rgb, params_para
+from particulas.core import CLASES, cargar_criterios, clasificar, encontrar_clusters, imagen_rgb, params_para
 from particulas.imagenes import FORMATOS
 from particulas.pipeline import cargar_amps
+from particulas.root import EXTENSIONES_ROOT
 
 MIN_CAJA = 5       # px: las cajas mas pequenas se agrandan (YOLO detecta mal objetos de 1-2 px)
 REPETIR_CHICO = 4  # grupos con < 10 % de los archivos del grupo mas grande se repiten en train
 REPETIR_ALFA = 8   # imagenes con alfas (muy raras) se repiten en train
 EXT_FITS = {".fits", ".fit", ".fts", ".fz"}
-DATOS_ORIGINALES = [os.path.join(RAIZ, "datos", "201211", "proc_*.fits"),
-                    os.path.join(RAIZ, "datos", "proc_corr_proc", "*.fits")]
+# datos del experimento original: en datos/ dentro del repositorio o en la carpeta de al lado
+_DATOS = next((d for d in (os.path.join(RAIZ, "datos"), os.path.join(os.path.dirname(RAIZ), "datos"))
+               if os.path.isdir(d)), os.path.join(RAIZ, "datos"))
+DATOS_ORIGINALES = [os.path.join(_DATOS, "201211", "proc_*.fits"),
+                    os.path.join(_DATOS, "proc_corr_proc", "*.fits")]
 
 
 def expandir(patron):
     """Carpeta o patron -> lista de archivos soportados."""
     if os.path.isdir(patron):
         patron = os.path.join(patron, "*")
-    ok = EXT_FITS | FORMATOS
+    ok = EXT_FITS | EXTENSIONES_ROOT | FORMATOS
     return sorted(f for f in glob.glob(patron) if os.path.splitext(f)[1].lower() in ok
                   or f.lower().endswith(".fits.gz"))
 
@@ -66,7 +72,7 @@ def cajas_yolo(cl, h, w):
 
 
 def procesar(args):
-    f, split, out, rep, grupo = args
+    f, split, out, rep, grupo, criterios = args
     filas = []
     base = f"g{grupo}_" + os.path.basename(f).split(".")[0]
     try:
@@ -76,7 +82,7 @@ def procesar(args):
         return filas
     for amp in amps:
         # imagenes sin calibrar: mismas reglas que en la deteccion (core.params_para)
-        p = params_para(amp)
+        p = params_para(amp, criterios)
         cl = encontrar_clusters(amp, p)
         for c in cl:
             c.clase = clasificar(c, p)
@@ -102,10 +108,17 @@ def main():
     ap.add_argument("--out", default=os.path.join(AQUI, "dataset"))
     ap.add_argument("--val", type=float, default=0.15, help="fraccion de archivos de cada grupo para validacion")
     # con grupos chicos (p.ej. 9 darks) un solo archivo de validacion no alcanza para ver sobreajuste
-    ap.add_argument("--val-min", type=int, default=1, help="minimo de archivos de validacion por grupo")
+    ap.add_argument("--val-min", type=int, default=1,
+                    help="minimo de archivos de validacion por grupo (si el grupo tiene al menos el triple)")
+    ap.add_argument("--criterios", default=None,
+                    help="archivo de criterios para las etiquetas (ver criterios.yaml); por defecto los del proyecto")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     a = ap.parse_args()
 
+    try:
+        criterios = cargar_criterios(a.criterios)
+    except (OSError, ValueError) as e:
+        sys.exit(f"Error en el archivo de criterios: {e}")
     grupos = [expandir(p) for p in (a.datos or DATOS_ORIGINALES)]
     for p, g in zip(a.datos or DATOS_ORIGINALES, grupos):
         print(f"grupo: {p} -> {len(g)} archivos")
@@ -124,16 +137,18 @@ def main():
     for i, grupo in enumerate(grupos):
         rep = REPETIR_CHICO if len(grupo) < 0.1 * mayor else 1
         g = grupo[:]; random.shuffle(g)
-        nval = min(len(g) - 1, max(a.val_min, round(len(g) * a.val))) if len(g) > 1 else 0
-        tareas += [(f, "val", a.out, 1, i) for f in g[:nval]]
-        tareas += [(f, "train", a.out, rep, i) for f in g[nval:]]
+        nval = max(1, round(len(g) * a.val)) if len(g) > 1 else 0
+        if len(g) >= 3 * a.val_min:        # --val-min solo si deja al menos 2/3 del grupo para entrenar
+            nval = max(nval, a.val_min)
+        tareas += [(f, "val", a.out, 1, i, criterios) for f in g[:nval]]
+        tareas += [(f, "train", a.out, rep, i, criterios) for f in g[nval:]]
     if not any(t[1] == "val" for t in tareas):
         # YOLO necesita al menos una imagen de validacion: se toma un archivo del grupo mas grande
         k = max(range(len(tareas)), key=lambda j: len(grupos[tareas[j][4]]))
-        f, _, out, _, gi = tareas[k]
-        tareas[k] = (f, "val", out, 1, gi)
+        f, _, out, _, gi, cr = tareas[k]
+        tareas[k] = (f, "val", out, 1, gi, cr)
         if len(tareas) == 1:
-            tareas.append((f, "train", out, 1, gi))
+            tareas.append((f, "train", out, 1, gi, cr))
             print("AVISO: un solo archivo; se usa para entrenar y validar (solo sirve como prueba).")
 
     filas = []
@@ -160,6 +175,9 @@ def main():
     with open(os.path.join(a.out, "data.yaml"), "w") as fh:
         fh.write(f"path: {os.path.abspath(a.out)}\ntrain: images/train\nval: images/val\n"
                  f"names:\n" + "".join(f"  {i}: {c}\n" for i, c in enumerate(CLASES)))
+    # para saber despues con que criterios se etiqueto (y usar los mismos en el applet)
+    if a.criterios:
+        shutil.copy(a.criterios, os.path.join(a.out, "criterios_usados.yaml"))
     if len(df):
         print(df.groupby(["split", "clase"]).size().unstack(fill_value=0))
     print(f"\nDataset listo en {a.out}. Siguiente paso: entrenar.py")

@@ -60,7 +60,46 @@ class Params:
     union_min_largo: float = 10.0     # px fisicos de cada tramo
     union_min_cos: float = 0.995      # ~5.7 grados
     union_max_hueco: float = 20.0     # px fisicos (con binning: al menos 3 columnas)
+    # --- sensor (lo usa el criterio de muones cortos)
+    espesor_um: float = ESPESOR_UM
+    pixel_um: float = PIXEL_UM
     usar_energia: bool = True                   # False en imagenes sin calibrar (energia no fisica)
+
+
+def cargar_criterios(ruta=None):
+    """Params desde un archivo YAML de criterios (ver para_entrenar/criterios.yaml). Solo hace falta poner
+    los valores que se quieren cambiar; el resto queda con los valores por defecto. Sin ruta: por defecto."""
+    from dataclasses import fields
+    if not ruta:
+        return Params()
+    import yaml
+    with open(ruta, encoding="utf-8") as fh:
+        datos = yaml.safe_load(fh) or {}
+    if not isinstance(datos, dict):
+        raise ValueError(f"{ruta}: el archivo tiene que ser una lista de 'nombre: valor'")
+    tipos = {f.name: f.type for f in fields(Params)}
+    desconocidos = sorted(set(datos) - set(tipos))
+    if desconocidos:
+        raise ValueError(f"{ruta}: criterios desconocidos {desconocidos}. Validos: {sorted(tipos)}")
+    valores = {}
+    for k, v in datos.items():
+        t = tipos[k]
+        try:
+            if t in (tuple, "tuple"):
+                v = tuple(float(x) for x in v)
+                if len(v) != 2 or v[0] >= v[1]:
+                    raise ValueError
+            elif t in (bool, "bool"):
+                if not isinstance(v, bool):
+                    raise ValueError
+            elif t in (int, "int"):
+                v = int(v)
+            else:
+                v = float(v)
+        except (TypeError, ValueError):
+            raise ValueError(f"{ruta}: valor invalido para '{k}': {v!r}") from None
+        valores[k] = v
+    return Params(**valores)
 
 
 def params_para(amp, p: Params = None):
@@ -486,7 +525,7 @@ def clasificar(c: Cluster, p: Params = Params()):
         return "muon"
     if p.usar_energia and L < p.muon_min_largo:
         lo, hi = p.mip_kev_um_binning if c.binx > 1 else p.mip_kev_um
-        kev_um = c.energia_kev / np.hypot(L * PIXEL_UM, ESPESOR_UM)
+        kev_um = c.energia_kev / np.hypot(L * p.pixel_um, p.espesor_um)
         # linea horizontal corta sin difusion y sin energia de muon: carga del registro serie
         if c.sigma_y < p.sre_max_sigma_y and c.filas <= 2 and kev_um < lo:
             return "artefacto"
