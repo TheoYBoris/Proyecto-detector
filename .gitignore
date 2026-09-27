@@ -1,0 +1,36 @@
+# Entorno de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Datos crudos (muy pesados, GitHub rechaza archivos > 100 MB)
+datos/
+*.zip
+*.fits
+*.fit
+*.fz
+*.root
+
+# Generados (se recrean con los scripts)
+para_entrenar/dataset/
+para_entrenar/runs/
+para_entrenar/revision_etiquetas/
+para_entrenar/modelo_entrenado/
+listo_para_usar/detecciones/
+listo_para_usar/convertidos/
+salidas_anteriores/
+detecciones/
+imagenes_png/
+convertidos/
+
+# Pesos de ultralytics que se descargan solos en la carpeta donde se ejecuta
+*.pt
+# ...excepto los dos modelos del proyecto:
+!listo_para_usar/modelo/detector_particulas.pt
+!para_entrenar/modelo_base/yolo11n.pt
+
+# Varios
+.Rhistory
+.gradio/
+.DS_Store
+Thumbs.db

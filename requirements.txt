@@ -1,0 +1,14 @@
+# Instalar torch con CUDA primero:
+#   pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cu126
+astropy==8.0.1
+awkward==2.14.0
+matplotlib==3.11.2
+numpy==2.5.3
+pandas==3.0.6
+pillow==12.3.0
+scikit-image==0.26.0
+scipy==1.18.1
+ultralytics==8.4.163
+uproot==5.7.6
+gradio==6.28.0
+pymupdf==1.28.2
