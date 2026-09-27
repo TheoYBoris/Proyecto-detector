@@ -10,6 +10,7 @@ estimación de la energía depositada cuando la imagen es un FITS calibrable.
 |---|---|
 | identificar partículas en mis imágenes ya mismo (applet web o línea de comandos) | [`listo_para_usar/`](listo_para_usar/README.md) · modelo **entrenado** incluido |
 | entrenar el detector con mis propios datos | [`para_entrenar/`](para_entrenar/README.md) · modelo **sin entrenar** + paso a paso |
+| entender qué se hizo, los resultados y el estado del proyecto | [`docs/bitacora/bitacora.pdf`](docs/bitacora/bitacora.pdf) · bitácora (LaTeX) |
 
 ## Estructura
 
@@ -28,7 +29,11 @@ estimación de la energía depositada cuando la imagen es un FITS calibrable.
 │   ├── core.py                            calibración, reconstrucción de trazas, reglas de clasificación
 │   ├── imagenes.py                        lectura de PNG/JPG/TIFF/PDF y conversión a pseudo-electrones
 │   ├── pipeline.py                        detección completa (YOLO o reglas) sobre un archivo
+│   ├── instrumentos.py                    perfiles Atucha-II / CONNIE (specs publicadas), masa, blob/difusión
 │   └── dibujo.py                          figuras con las cajas
+├── docs/bitacora/          bitácora del proyecto (documento vivo)
+│   ├── bitacora.tex / bitacora.pdf        compilar con: pdflatex bitacora.tex
+│   └── generar_figuras.py                 regenera las figuras y los números citados
 ├── herramientas/
 │   └── ver_imagenes.py                    visor simple de FITS/ROOT
 └── datos/                  datos crudos del experimento (no se suben al repositorio)

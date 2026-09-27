@@ -29,6 +29,15 @@ convertidos/
 !listo_para_usar/modelo/detector_particulas.pt
 !para_entrenar/modelo_base/yolo11n.pt
 
+# Auxiliares de LaTeX (la bitacora versiona el .tex, el .pdf y las figuras)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
 # Varios
 .Rhistory
 .gradio/

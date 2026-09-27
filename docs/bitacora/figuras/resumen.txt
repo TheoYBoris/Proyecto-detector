@@ -1,0 +1,9 @@
+imagenes: 30
+trazas: 6251  por imagen: 208
+por clase: {'electron': 2963, 'puntual': 1712, 'muon': 1316, 'artefacto': 260}
+por imagen: {'electron': 98.8, 'puntual': 57.1, 'muon': 43.9, 'artefacto': 8.7}
+ruido medio por amp [e]: [0.208, 0.191, 0.276, 0.256]  std: [0.005, 0.004, 0.005, 0.005]
+ganancia media por amp [ADU/e]: [865.0, 859.0, 748.0, 772.0]  std: [4.0, 3.0, 9.0, 7.0]
+masa activa [g]: 2.2167
+pico del espectro de muones [keV]: 400
+mediana energia muones [keV]: 496

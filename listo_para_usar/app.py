@@ -22,6 +22,8 @@ import pandas as pd
 from particulas.core import CLASES, DESCRIPCION
 from particulas.dibujo import COLORES
 from particulas.imagenes import FORMATOS, es_imagen, guardar_fits
+from particulas.instrumentos import (ENERGIA_BLOB_EV, INSTRUMENTOS, LINEAS_CU_KEV, RANGO_ALFA_MEV,
+                                     detectar_instrumento, masa_amps)
 from particulas.pipeline import METODOS, MODELO_DEFAULT, cargar_modelo, guardar_figura, procesar_archivo
 
 NOMBRES = {"muon": "Muón", "electron": "Electrón", "alfa": "Alfa", "puntual": "Puntual", "artefacto": "Artefacto"}
@@ -38,11 +40,46 @@ def modelo():
     return MODELO
 
 
-def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, progress=gr.Progress()):
+def espectro(filas, ruta_png):
+    """Espectro de energia de las trazas (solo FITS calibrados), con referencias de los papers."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    df = pd.DataFrame(filas)
+    if df.empty or df["energia_kev"].notna().sum() == 0:
+        return None
+    df = df[df["energia_kev"] > 0]
+    bins = np.logspace(np.log10(0.05), np.log10(3e4), 90)
+    fig, ax = plt.subplots(figsize=(9, 4.2))
+    for c in CLASES:
+        e = df.loc[df["clase"] == c, "energia_kev"]
+        if len(e):
+            ax.hist(e, bins=bins, histtype="step", lw=1.6, color=COLORES[c], label=f"{NOMBRES[c]} ({len(e)})")
+    ax.set_xscale("log"); ax.set_yscale("log")
+    for n, e in LINEAS_CU_KEV.items():
+        ax.axvline(e, color="0.4", ls="--", lw=0.9)
+        ax.text(e, 0.97, f" {n}", rotation=90, va="top", fontsize=7, color="0.3",
+                transform=ax.get_xaxis_transform())
+    ax.axvline(ENERGIA_BLOB_EV / 1000, color="#0a84ff", ls=":", lw=1)
+    ax.text(ENERGIA_BLOB_EV / 1000, 0.97, " 600 eV: difusión | blob", rotation=90, va="top", fontsize=7,
+            color="#0a84ff", transform=ax.get_xaxis_transform())
+    ax.axvspan(RANGO_ALFA_MEV[0] * 1e3, RANGO_ALFA_MEV[1] * 1e3, color="#ffcc00", alpha=0.12, lw=0)
+    ax.set_xlabel("energía depositada [keV]  (3.75 eV por par e⁻-hueco)")
+    ax.set_ylabel("trazas por bin")
+    ax.set_title("Espectro de energía — las líneas del Cu (8.05 / 8.91 keV) sirven para verificar la calibración",
+                 fontsize=9)
+    ax.legend(fontsize=8, ncol=3)
+    fig.tight_layout(); fig.savefig(ruta_png, dpi=130); plt.close(fig)
+    return ruta_png
+
+
+def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, instrumento, exposicion,
+                      umbral_ev=225, progress=gr.Progress()):
     if not archivos:
         raise gr.Error("Subí al menos un archivo (FITS, PNG, JPG, TIFF o PDF).")
     salida = tempfile.mkdtemp(prefix="particulas_")
-    galeria, filas_conteo, todas, errores = [], [], [], []
+    galeria, filas_conteo, filas_tasas, todas, errores, avisos = [], [], [], [], [], []
     hubo_imagenes = False
     t0 = time.time()
     for i, f in enumerate(archivos):
@@ -50,27 +87,55 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, p
         nombre = os.path.basename(ruta)
         base = nombre.rsplit(".", 1)[0].replace(".fits", "")
         progress(i / len(archivos), desc=f"Analizando {nombre}")
+        imagen = es_imagen(ruta)
+        inst = INSTRUMENTOS.get(instrumento, INSTRUMENTOS["auto"])
+        if inst.clave == "auto":
+            inst = INSTRUMENTOS["generico"] if imagen else detectar_instrumento(ruta)
+        # binning de imagenes: el indicado, o el tipico del instrumento elegido
+        bx = int(binx) if binx and binx >= 1 else inst.binx
         try:
             amps, dets, usado = procesar_archivo(
                 ruta, metodo, modelo() if metodo != "reglas" else None, conf,
                 ganancia if ganancia and ganancia > 0 else None,
-                escala=float(escala or 1.0), binx=int(binx or 1), paneles=bool(paneles))
+                escala=float(escala or 1.0), binx=bx, paneles=bool(paneles),
+                umbral_e=(float(umbral_ev) / (inst.ev_por_e)) if umbral_ev else None)
         except Exception as e:  # archivo corrupto, formato no reconocido, sin imagenes, etc.
             # no mostrar rutas internas del servidor: dejar solo el nombre del archivo
             detalle = re.sub(r"'[^']*[\\/]([^'\\/]+)'", r"'\1'", str(e))
             errores.append(f"**{nombre}**: no se pudo procesar — formato no reconocido o archivo dañado "
                            f"({type(e).__name__}: {detalle[:200]})")
             continue
-        imagen = es_imagen(ruta)
         hubo_imagenes |= imagen
         filas = [dict(archivo=nombre, **d) for ds in dets for d in ds]
         todas += filas
         cuenta = pd.Series([d["clase"] for d in filas], dtype=object).value_counts()
-        fila = {"Archivo": nombre, "Tipo": "Imagen (sin calibrar)" if imagen else "FITS calibrado",
+        sub = pd.Series([d["subclase"] for d in filas if d["subclase"]], dtype=object).value_counts()
+        fila = {"Archivo": nombre, "Instrumento": inst.nombre.split(" (")[0],
+                "Tipo": "Imagen (sin calibrar)" if imagen else "FITS calibrado",
                 "Método": METODOS[usado].split(" (")[0], "Paneles": len(amps), "Binning": f"x{amps[0].binx}"}
         fila.update({NOMBRES[c]: int(cuenta.get(c, 0)) for c in CLASES})
+        fila["Blob (>600 eV)"] = int(sub.get("blob", 0))
+        fila["Difusión (<600 eV)"] = int(sub.get("difusion", 0))
         fila["Total"] = len(filas)
         filas_conteo.append(fila)
+
+        if not imagen:
+            # ruido medido vs. publicado para el instrumento (p.ej. Atucha-II: 2 de 4 cuadrantes a 0.17 e-)
+            if inst.ruido_e == inst.ruido_e:   # no NaN
+                malos = [f"amp {a.hdu}: {a.ruido_e:.2f} e⁻" for a in amps if a.ruido_e > 1.3 * inst.ruido_e]
+                if malos:
+                    avisos.append(f"**{nombre}**: ruido mayor al publicado para {inst.nombre.split(' (')[0]} "
+                                  f"({inst.ruido_e} e⁻) en {', '.join(malos)}. Esos amplificadores tienen menor "
+                                  f"sensibilidad a depósitos de baja energía.")
+            # tasas por masa y tiempo de exposicion
+            exp_h = float(exposicion) if exposicion and exposicion > 0 else inst.exposicion_h
+            masa = masa_amps(amps, inst)
+            if exp_h == exp_h and masa > 0:
+                dias = exp_h / 24.0
+                t = {"Archivo": nombre, "Masa activa [g]": round(masa, 4), "Exposición [h]": round(exp_h, 3)}
+                t.update({f"{NOMBRES[c]} [ev/(g·día)]": round(cuenta.get(c, 0) / (masa * dias), 1) for c in CLASES})
+                t["Difusión [ev/(g·día)]"] = round(sub.get("difusion", 0) / (masa * dias), 1)
+                filas_tasas.append(t)
 
         png = os.path.join(salida, base + "_identificado.png")
         guardar_figura(amps, dets, png, titulo=f"{nombre}  -  {METODOS[usado]}")
@@ -85,12 +150,18 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, p
         raise gr.Error("Ningún archivo se pudo procesar. " + " ".join(e.replace("**", "") for e in errores))
 
     conteo = pd.DataFrame(filas_conteo)
-    total = {"Archivo": "TOTAL", "Tipo": "", "Método": "", "Paneles": int(conteo["Paneles"].sum()), "Binning": ""}
-    total.update({NOMBRES[c]: int(conteo[NOMBRES[c]].sum()) for c in CLASES})
-    total["Total"] = int(conteo["Total"].sum())
+    total = {"Archivo": "TOTAL", "Instrumento": "", "Tipo": "", "Método": "",
+             "Paneles": int(conteo["Paneles"].sum()), "Binning": ""}
+    for col in [NOMBRES[c] for c in CLASES] + ["Blob (>600 eV)", "Difusión (<600 eV)", "Total"]:
+        total[col] = int(conteo[col].sum())
     conteo = pd.concat([conteo, pd.DataFrame([total])], ignore_index=True)
     conteo.to_csv(os.path.join(salida, "conteo_particulas.csv"), index=False)
     pd.DataFrame(todas).to_csv(os.path.join(salida, "todas_las_detecciones.csv"), index=False)
+    tasas = pd.DataFrame(filas_tasas)
+    if len(tasas):
+        tasas.to_csv(os.path.join(salida, "tasas_por_masa.csv"), index=False)
+    png_espectro = espectro([d for d in todas if d["energia_kev"] == d["energia_kev"]],
+                            os.path.join(salida, "espectro_energia.png"))
 
     zip_path = os.path.join(salida, "resultados_particulas.zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -103,6 +174,14 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, p
     lineas = [f"### {total['Total']} trazas identificadas en {len(filas_conteo)} archivo(s) "
               f"({time.time() - t0:.1f} s)",
               " · ".join(f"**{NOMBRES[c]}**: {total[NOMBRES[c]]}" for c in CLASES)]
+    if total["Blob (>600 eV)"] + total["Difusión (<600 eV)"]:
+        lineas.append(f"Depósitos puntuales (convención CONNIE): **{total['Blob (>600 eV)']} blobs** (> 600 eV) y "
+                      f"**{total['Difusión (<600 eV)']} de difusión** (< 600 eV; incluyen los candidatos a CEvNS).")
+    if filas_tasas and not (exposicion and exposicion > 0):
+        lineas.append("ℹ️ **Tasas:** se supuso como exposición el tiempo de lectura publicado para el instrumento "
+                      "(lectura continua). Si tus imágenes tienen otra exposición, indicala en *Opciones avanzadas*.")
+    if avisos:
+        lineas.append("ℹ️ " + "\n\nℹ️ ".join(avisos))
     if hubo_imagenes:
         lineas.append("⚠️ **Imágenes PNG/JPG/TIFF/PDF:** no traen los valores crudos del sensor, así que no se "
                       "pueden calibrar. La clasificación usa la forma de las trazas, pero **la energía no está "
@@ -111,7 +190,8 @@ def analizar_archivos(archivos, metodo, conf, ganancia, escala, binx, paneles, p
     if errores:
         lineas.append("**Archivos con problemas:**\n\n" + "\n".join(f"- {e}" for e in errores))
     progress(1.0)
-    return "\n\n".join(lineas), conteo, barras, galeria, zip_path
+    return ("\n\n".join(lineas), conteo, barras, galeria, zip_path, png_espectro,
+            tasas if len(tasas) else None)
 
 
 LEYENDA = "\n".join(
@@ -142,7 +222,25 @@ AYUDA = """
 - *Detector YOLO*: red neuronal entrenada sobre ~100 000 trazas.
 - *Reglas físicas*: clasificación directa por forma (largo, ancho, curvatura) y energía.
 
-**Energía (solo FITS):** carga total de la traza × 3.75 eV por par electrón-hueco; subestimada si hay saturación.
+**Instrumento.** En *Automático* se reconoce por la geometría del CCD en el encabezado FITS. Los perfiles usan
+las especificaciones publicadas; todos son Skipper-CCD de 15 µm de píxel y 675 µm de espesor.
+- *Atucha-II* (Depaoli et al., JHEP 10 (2024) 155): 6144×1024 px, binning ×10, 300 muestras, ruido 0.17 e⁻
+  (2 de los 4 cuadrantes), 53 min de lectura por imagen.
+- *CONNIE* (PRL 134 (2025) 071801; Mirthis, ICHEP 2026): 1022×682 px, 400 muestras, ruido 0.15 e⁻.
+
+El perfil se usa para avisar si un amplificador tiene más ruido que el publicado, para calcular la masa
+activa y las tasas, y como binning por defecto de las imágenes sin encabezado.
+
+**Energía (solo FITS):** carga total de la traza × 3.75 eV por par electrón-hueco; subestimada si hay
+saturación. En el espectro, las líneas de fluorescencia del cobre (Kα 8.05 keV, Kβ 8.91 keV) permiten
+verificar la calibración, como hace Atucha-II.
+
+**Depósitos puntuales (convención CONNIE):** *blob* si superan 600 eV (electrones o fotones de baja energía)
+y *difusión* si están por debajo (rayos X, gammas de baja energía; incluyen los candidatos a CEvNS).
+
+**Tasas:** eventos / (masa activa × exposición), en eventos por gramo por día. La masa sale de la zona activa
+leída (píxeles × binning × 15 µm × 15 µm × 675 µm × 2.329 g/cm³). La exposición es la del perfil del
+instrumento, o la que indiques.
 
 **Limitación:** las etiquetas de entrenamiento salen de reglas morfológicas, no de una verdad de campo.
 Las alfas son escasas en el entrenamiento, así que el detector casi no las reconoce.
@@ -159,13 +257,22 @@ def construir_app():
                 archivos = gr.File(label="Imágenes (FITS, PNG, JPG, TIFF, PDF)", file_count="multiple",
                                    file_types=EXTENSIONES)
                 metodo = gr.Radio([(v, k) for k, v in METODOS.items()], value="auto", label="Método")
+                instrumento = gr.Dropdown([(v.nombre, k) for k, v in INSTRUMENTOS.items()], value="auto",
+                                          label="Instrumento")
                 with gr.Accordion("Opciones para PNG / JPG / PDF", open=False):
                     paneles = gr.Checkbox(value=True, label="Recortar ejes de figuras (detectar paneles)")
                     escala = gr.Number(value=1.0, minimum=0.1, label="Escala: píxeles de imagen por píxel del CCD")
-                    binx = gr.Number(value=1, minimum=1, precision=0, label="Binning de columnas del CCD")
+                    binx = gr.Number(value=0, minimum=0, precision=0,
+                                     label="Binning de columnas del CCD (0 = el del instrumento)")
                 with gr.Accordion("Opciones avanzadas", open=False):
                     conf = gr.Slider(0.05, 0.9, value=0.25, step=0.05, label="Confianza mínima (solo YOLO)")
                     ganancia = gr.Number(value=0, label="Ganancia en ADU/e⁻ para FITS (0 = automática)", minimum=0)
+                    exposicion = gr.Number(value=0, minimum=0,
+                                           label="Exposición por imagen en horas, para las tasas (0 = la del instrumento)")
+                    umbral = gr.Dropdown([("225 eV (60 e⁻) — por defecto, como el entrenamiento", 225),
+                                          ("45 eV (12 e⁻) — umbral de Atucha-II (JHEP 2024)", 45),
+                                          ("15 eV (4 e⁻) — umbral de CONNIE (PRL 2025)", 15)],
+                                         value=225, label="Energía mínima por evento (FITS)")
                 boton = gr.Button("Identificar partículas", variant="primary")
                 gr.Markdown("**Clases**\n\n" + LEYENDA)
             with gr.Column(scale=3):
@@ -175,14 +282,20 @@ def construir_app():
                                         sort=None, height=260)
                     descarga = gr.File(label="Descargar todo (PNG + CSV + FITS convertidos)")
                 conteo = gr.Dataframe(label="Conteo por archivo", interactive=False, wrap=True,
-                                      headers=["Archivo", "Tipo", "Método", "Paneles", "Binning"]
-                                      + [NOMBRES[c] for c in CLASES] + ["Total"])
+                                      headers=["Archivo", "Instrumento", "Tipo", "Método", "Paneles", "Binning"]
+                                      + [NOMBRES[c] for c in CLASES]
+                                      + ["Blob (>600 eV)", "Difusión (<600 eV)", "Total"])
                 galeria = gr.Gallery(label="Imágenes identificadas", columns=1, height="auto",
                                      object_fit="contain", preview=True)
+                with gr.Accordion("Espectro de energía y tasas (FITS calibrados)", open=True):
+                    img_espectro = gr.Image(label="Espectro de energía", type="filepath", show_label=False)
+                    tasas = gr.Dataframe(label="Tasas por masa activa y tiempo de exposición",
+                                         interactive=False, wrap=True)
         with gr.Accordion("Ayuda", open=False):
             gr.Markdown(AYUDA)
-        boton.click(analizar_archivos, [archivos, metodo, conf, ganancia, escala, binx, paneles],
-                    [resumen, conteo, barras, galeria, descarga])
+        boton.click(analizar_archivos,
+                    [archivos, metodo, conf, ganancia, escala, binx, paneles, instrumento, exposicion, umbral],
+                    [resumen, conteo, barras, galeria, descarga, img_espectro, tasas])
     return app
 
 

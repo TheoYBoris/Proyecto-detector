@@ -67,6 +67,7 @@ class Amp:
     columnas_malas: list = field(default_factory=list)
     calibrada: bool = True       # False: viene de una imagen PNG/JPG/PDF (pseudo-electrones)
     etiqueta: str = ""           # nombre del panel/pagina (imagenes)
+    filas_activas: int = 0       # filas fisicas del cuadrante (CCDNROW/2); el resto es overscan vertical
 
 
 def _modelo_poisson(x, N, lam, g, s, mu):
@@ -142,7 +143,9 @@ def calibrar(archivo, hdu, ganancia=None):
 
     g = ganancia or _estimar_ganancia(act, sigma, default=500.0 if binx == 1 else 870.0)
     e = np.nan_to_num(act / g, nan=0.0)
-    return Amp(archivo, hdu, e, binx, x0, g, sigma / g, [int(m + x0) for m in malas])
+    ccdnrow = _hint(h0, "CCDNROW")
+    filas = min(e.shape[0], ccdnrow // 2) if ccdnrow else e.shape[0]
+    return Amp(archivo, hdu, e, binx, x0, g, sigma / g, [int(m + x0) for m in malas], filas_activas=filas)
 
 
 def calibrar_fits(archivo, ganancia=None):
