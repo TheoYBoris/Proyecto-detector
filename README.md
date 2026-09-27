@@ -99,9 +99,15 @@ No había etiquetas, así que el entrenamiento es en dos etapas:
 4. **Detector YOLO11n** (`para_entrenar/entrenar.py`), entrenado con esas etiquetas sobre imágenes de 3
    canales: log(E), E lineal de baja energía y máscara ≥ 4 e⁻. Cada amplificador es una imagen.
 
-En la detección se aplican además dos filtros físicos. Se descartan las cajas sin un depósito real (sin
-ningún píxel ≥ 20 e⁻ o con menos de 60 e⁻ en total), y se usa NMS agnóstico a la clase para que una traza
-no reciba dos cajas de clases distintas.
+**Detección = reconstrucción + red** (`pipeline.detectar_hibrido`, desde v0.6). Las trazas (píxeles, caja y
+energía) salen de la reconstrucción por píxeles, y la red sólo las clasifica: cada traza toma la clase de la
+caja de la red que mejor se le superpone (IoU ≥ 0.3). Si la red no tiene caja para esa traza (por ejemplo,
+depósitos bajo los 60 e⁻ con que se entrenó), clasifican las reglas; la columna `origen` del CSV dice cuál.
+Antes, las cajas de la red eran el resultado final y un muón largo cruzado por otra partícula podía salir
+partido en varias cajas: la red dejaba fragmentos en el 19 % de esos muones. La reconstrucción no parte muones
+y separa las partículas que los cruzan; además la energía de cada traza ya no incluye la de lo que la cruza.
+En los 75 archivos de validación (15 554 trazas) coincide con las reglas más que la red sola en todas las
+clases (electrón 79 → 86 %, muón 78 → 80 %, puntual 91 → 98 %, artefacto 85 → 89 %).
 
 ## Resultados del modelo entrenado (validación: 300 imágenes no vistas, 15 434 trazas)
 
@@ -181,6 +187,8 @@ Recomendaciones: subir la imagen cruda en vez de una figura. Si la imagen está 
   (15 px con binning) no se recuperan.
 - **Alfas**: son muy pocas (45 en todo el dataset), así que el detector las aprende mal.
 - Las trazas que se cruzan sin que ninguna sea recta quedan en una sola caja.
+- Cuando una partícula cruza un muón, la reconstrucción separa la recta del muón y lo que queda de la otra
+  partícula puede salir en dos trazas (una a cada lado), o el píxel del cruce como un depósito chico aparte.
 - La energía de trazas saturadas (alfas, muones muy horizontales en el run 43) está subestimada.
 - La GTX 1660 no soporta bien FP16 (AMP), así que se entrenó en FP32 con YOLO11n y batch 8.
 

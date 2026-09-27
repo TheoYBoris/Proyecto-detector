@@ -17,7 +17,7 @@ MODELO_DEFAULT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__
 
 METODOS = {
     "auto": "Automático (YOLO con binning, reglas sin binning)",
-    "yolo": "Detector YOLO (red neuronal)",
+    "yolo": "Detector YOLO (red neuronal que clasifica las trazas reconstruidas)",
     "reglas": "Reglas físicas (morfología)",
 }
 
@@ -25,9 +25,6 @@ METODOS = {
 def cargar_modelo(ruta=MODELO_DEFAULT):
     from ultralytics import YOLO
     return YOLO(ruta)
-
-
-UMBRAL_ENTRENAMIENTO_E = Params().min_energia_e   # el detector vio eventos de >= 60 e- (225 eV)
 
 
 def params_umbral(umbral_e=None):
@@ -74,7 +71,54 @@ def detectar_reglas(amps, p: Params = Params()):
         pa = params_para(amp, p)
         dets = []
         for c in encontrar_clusters(amp, pa):
-            dets.append(dict(amp=amp.hdu, clase=clasificar(c, pa), confianza=float("nan"),
+            dets.append(dict(amp=amp.hdu, clase=clasificar(c, pa), confianza=float("nan"), origen="reglas",
+                             x0=float(c.x0), x1=float(c.x1), y0=float(c.y0), y1=float(c.y1),
+                             energia_e=c.energia_e, energia_kev=c.energia_kev))
+        salida.append(dets)
+    return salida
+
+
+IOU_MIN = 0.3        # caja de la red que corresponde a una traza reconstruida
+
+
+def _caja_etiqueta(c):
+    """Caja con la que se entreno la red para un cluster (construir_dataset.cajas_yolo): +-1 px, minimo 5 px."""
+    x0, y0, x1, y1 = c.x0 - 1, c.y0 - 1, c.x1 + 1, c.y1 + 1
+    if x1 - x0 < 5:
+        m = (5 - (x1 - x0)) / 2; x0 -= m; x1 += m
+    if y1 - y0 < 5:
+        m = (5 - (y1 - y0)) / 2; y0 -= m; y1 += m
+    return x0, y0, x1, y1
+
+
+def _iou(a, b):
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0])); iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    i = ix * iy
+    return i / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i + 1e-9)
+
+
+def detectar_hibrido(model, amps, conf=0.25, imgsz=640, prm: Params = None):
+    """Red neuronal + reconstruccion. Las trazas (pixeles, caja, energia) salen de la reconstruccion por
+    pixeles de las reglas, que separa las particulas que se cruzan y no parte los muones; la red solo
+    clasifica: cada traza toma la clase de la caja de la red que mejor se le superpone (IoU >= 0.3). Si la
+    red no tiene caja para esa traza (p.ej. depositos bajo el umbral con que se entreno), clasifican las
+    reglas. Asi un muon largo que otra particula cruza no queda partido en varias cajas."""
+    prm = prm or Params()
+    cajas = detectar_yolo(model, amps, conf, imgsz, prm)
+    salida = []
+    for amp, ds in zip(amps, cajas):
+        pa = params_para(amp, prm)
+        bs = [(d["x0"], d["y0"], d["x1"], d["y1"]) for d in ds]
+        dets = []
+        for c in encontrar_clusters(amp, pa):
+            b = _caja_etiqueta(c)
+            ious = [_iou(b, x) for x in bs]
+            k = int(np.argmax(ious)) if ious else -1
+            if k >= 0 and ious[k] >= IOU_MIN:
+                clase, confianza, origen = ds[k]["clase"], ds[k]["confianza"], "red"
+            else:
+                clase, confianza, origen = clasificar(c, pa), float("nan"), "reglas"
+            dets.append(dict(amp=amp.hdu, clase=clase, confianza=confianza, origen=origen,
                              x0=float(c.x0), x1=float(c.x1), y0=float(c.y0), y1=float(c.y1),
                              energia_e=c.energia_e, energia_kev=c.energia_kev))
         salida.append(dets)
@@ -87,19 +131,6 @@ def cargar_amps(ruta, ganancia=None, escala=1.0, binx=1, paneles=True):
     if es_imagen(ruta):
         return cargar_imagen(ruta, escala=escala, binx=binx, paneles=paneles)
     return calibrar_fits(ruta, ganancia)
-
-
-def _agregar_baja_energia(amps, dets, prm):
-    """Modo hibrido: los depositos por debajo del umbral con que se entreno YOLO se toman de las reglas,
-    salvo los que ya caen dentro de una caja del detector."""
-    for amp, ds, extra in zip(amps, dets, detectar_reglas(amps, prm)):
-        for d in extra:
-            if d["energia_e"] >= UMBRAL_ENTRENAMIENTO_E:
-                continue
-            cx, cy = (d["x0"] + d["x1"]) / 2, (d["y0"] + d["y1"]) / 2
-            if not any(b["x0"] <= cx <= b["x1"] and b["y0"] <= cy <= b["y1"] for b in ds):
-                ds.append(d)
-    return dets
 
 
 def procesar_archivo(ruta, metodo="auto", model=None, conf=0.25, ganancia=None,
@@ -117,9 +148,9 @@ def procesar_archivo(ruta, metodo="auto", model=None, conf=0.25, ganancia=None,
     if usado == "yolo":
         if model is None:
             model = cargar_modelo()
-        dets = detectar_yolo(model, amps, conf, prm=prm)
-        if prm.min_energia_e < UMBRAL_ENTRENAMIENTO_E:
-            dets = _agregar_baja_energia(amps, dets, prm)
+        # las trazas salen de la reconstruccion y la red las clasifica (ver detectar_hibrido). Los depositos
+        # bajo el umbral de entrenamiento (60 e-) no tienen caja de la red y los clasifican las reglas.
+        dets = detectar_hibrido(model, amps, conf, prm=prm)
     else:
         dets = detectar_reglas(amps, prm)
     from .instrumentos import subclase_puntual

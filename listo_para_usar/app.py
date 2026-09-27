@@ -231,7 +231,9 @@ AYUDA = """
 
 **Métodos**
 - *Automático*: detector YOLO en imágenes con binning de columnas; reglas físicas sin binning.
-- *Detector YOLO*: red neuronal entrenada sobre ~100 000 trazas.
+- *Detector YOLO*: las trazas salen de la reconstrucción por píxeles (que separa las partículas que se cruzan y
+  no parte los muones) y una red neuronal entrenada sobre ~100 000 trazas clasifica cada una. Las que la red
+  no ve las clasifican las reglas (columna `origen` del CSV).
 - *Reglas físicas*: clasificación directa por forma (largo, ancho, curvatura) y energía.
 
 **Muones cortos.** Un muón cruza los 675 µm del sensor, así que su traza mide 45·tan(ángulo) píxeles: los que

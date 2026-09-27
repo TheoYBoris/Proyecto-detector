@@ -24,7 +24,7 @@
 \setlength{\parskip}{3pt}
 \setlength{\parindent}{0pt}
 
-\newcommand{\version}{0.5}
+\newcommand{\version}{0.6}
 \newcommand{\fecha}{27 de septiembre de 2026}
 \newcommand{\eminus}{e$^-$}
 \newcommand{\abierto}[1]{\textcolor{orange!80!black}{\textbf{[abierto]} #1}}
@@ -159,6 +159,15 @@ automáticas. Cada amplificador es una imagen de 3 canales: $\log E$, $E$ lineal
 $\geq 4$~\eminus. Se usaron 2038 imágenes de entrenamiento y 300 de validación ($\sim$103\,000 trazas),
 60 épocas y batch 8, en FP32 sin \emph{mosaic}, en una GTX~1660 SUPER ($\sim$1.5~h). Durante la inferencia
 se descartan cajas sin un depósito real y se usa NMS agnóstico a la clase.
+
+\textbf{Reconstrucción + red} (v0.6). La red dejaba fragmentos en el 19\,\% de los muones largos cruzados por
+otra partícula (tramos del muón como puntual, electrón o un segundo muón). Ahora las trazas salen de la
+reconstrucción, que no parte muones (0 de 73) y separa lo que los cruza. La red sólo las clasifica: cada traza
+toma la clase de la caja con mayor IoU ($\geq0.3$), y las reglas clasifican las que la red no ve
+(5.6\,\%). También se separan las partículas que tocan un muón aunque el conjunto siga pareciendo un muón.
+En validación coincide con las reglas más que la red sola en todas las clases (electrón 79$\to$86\,\%,
+muón 78$\to$80\,\%, puntual 91$\to$98\,\%). Se probó antes absorber cajas sobre la recta del muón: quitaba
+$\sim$9 fragmentos pero perdía $\sim$18 partículas reales, y se descartó.
 
 \textbf{Imágenes no calibradas} (PNG, JPG, TIFF, PDF). Se convierten a \emph{pseudo-electrones}:
 luminancia, recorte automático de los ejes de figuras, resta de fondo y reescalado logarítmico sobre el ruido
@@ -310,6 +319,8 @@ Fecha & Cambio \\
   genérico, TH2), con resultados idénticos al FITS en los 9 darks; conversor ROOT$\to$FITS; licencia MIT. \\
 27/09/2026 & v0.5: orientación (vertical) y exposición ($\sim$32~min) de Atucha-II a partir de~\cite{depaoli2024} y
   los datos; muones cortos validados con MC $\cos^2\theta$; SRE por $\sigma_y$; detector v2 reentrenado. \\
+27/09/2026 & v0.6: las trazas salen de la reconstrucción y la red las clasifica (los muones cruzados ya no se
+  parten); las reglas separan partículas pegadas a muones. \\
 \bottomrule
 \end{tabularx}}
 

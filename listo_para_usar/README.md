@@ -49,5 +49,6 @@ Además, a partir de las especificaciones publicadas del instrumental (ver `docs
 ..\.venv\Scripts\python.exe convertir_a_fits.py "..\..\datos\201211\*.root"
 ```
 
-Métodos: `auto` (YOLO en imágenes con binning, reglas físicas sin binning), `yolo` o `reglas`.
+Métodos: `auto` (YOLO en imágenes con binning, reglas físicas sin binning), `yolo` o `reglas`. Con `yolo` las
+trazas salen de la reconstrucción por píxeles y la red clasifica cada una (columna `origen` del CSV).
 Detalles del algoritmo y sus limitaciones: ver el `README.md` de la raíz.

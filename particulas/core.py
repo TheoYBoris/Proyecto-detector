@@ -324,8 +324,11 @@ def _separar_recta(m, e, amp, p):
     return partes if len(partes) > 1 else None
 
 
-def encontrar_clusters(amp: Amp, p: Params = Params()):
+def encontrar_clusters(amp: Amp, p: Params = Params(), con_mapa=False):
+    """Clusters (una traza cada uno). con_mapa=True devuelve ademas un mapa del tamano de la imagen con
+    el numero de cluster (1..n) de cada pixel, 0 = sin traza."""
     e = amp.electrones
+    mapa = np.zeros(e.shape, np.int32) if con_mapa else None
     fuerte = e >= p.semilla_e
     debil = e >= p.crecer_e
     # histeresis: componentes de 'debil' que contienen alguna semilla
@@ -344,7 +347,10 @@ def encontrar_clusters(amp: Amp, p: Params = Params()):
         pendientes = [m]
         for _ in range(4):                       # hasta 3 rectas separadas por cluster
             c = _medir(pendientes[-1], es, sl[0].start, sl[1].start, amp)
-            if c.largo < 40 or clasificar(c, p) == "muon":
+            # tambien se intenta con los que ya parecen muones: una particula que toca un muon largo casi
+            # no cambia su ancho/largo, y sin esto quedaba pegada al muon (_separar_recta solo separa
+            # restos de >= 8 px y >= 3*min_energia_e; el halo de la propia traza se queda en la recta)
+            if c.largo < 40:
                 break
             partes = _separar_recta(pendientes[-1], es, amp, p)
             if partes is None:
@@ -355,7 +361,9 @@ def encontrar_clusters(amp: Amp, p: Params = Params()):
         for q in pendientes:
             if es[q].sum() >= p.min_energia_e and q.sum() >= p.min_pixeles:
                 out.append(_medir(q, es, sl[0].start, sl[1].start, amp))
-    return out
+                if mapa is not None:
+                    mapa[sl][q] = len(out)
+    return (out, mapa) if mapa is not None else out
 
 
 # ----------------------------------------------------------------------------- clasificacion
