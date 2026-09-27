@@ -187,8 +187,16 @@ Recomendaciones: subir la imagen cruda en vez de una figura. Si la imagen está 
   (15 px con binning) no se recuperan.
 - **Alfas**: son muy pocas (45 en todo el dataset), así que el detector las aprende mal.
 - Las trazas que se cruzan sin que ninguna sea recta quedan en una sola caja.
-- Cuando una partícula cruza un muón, la reconstrucción separa la recta del muón y lo que queda de la otra
-  partícula puede salir en dos trazas (una a cada lado), o el píxel del cruce como un depósito chico aparte.
+- Cuando una partícula cruza un muón, el píxel del cruce puede salir como un depósito chico aparte. Las dos
+  mitades de la partícula que cruza se vuelven a unir si quedan en la misma recta (ver abajo).
+- **Tramos colineales** (`core._unir_colineales`, v0.7): un muón largo quedaba partido cuando cruzaba una columna
+  enmascarada por la calibración, cuando su carga bajaba del umbral en algún píxel o donde lo cruzaba otra
+  partícula. Cada tramo tenía sólo parte de la energía y los cortos terminaban como electrones. Ahora se unen
+  dos tramos rectos casi paralelos (< 6°), sobre la misma recta y con un hueco chico (≤ 20 px físicos sin
+  binning, ≤ 3 columnas con binning, sin contar las columnas enmascaradas del medio). Muones partidos:
+  17 → 2 en los darks y 38 → 6 en el run 43 (las 6 restantes son líneas de artefacto); en los darks, 65 trazas
+  que salían como electrones eran tramos de muones. La energía de la traza unida no incluye la de las
+  columnas enmascaradas.
 - La energía de trazas saturadas (alfas, muones muy horizontales en el run 43) está subestimada.
 - La GTX 1660 no soporta bien FP16 (AMP), así que se entrenó en FP32 con YOLO11n y batch 8.
 

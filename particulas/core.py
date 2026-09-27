@@ -55,6 +55,11 @@ class Params:
     mip_kev_um_binning: tuple = (0.236, 0.79)   # con binning de columnas
     # --- eventos del registro serie: sin difusion vertical (sigma_y < 0.3, corte de Atucha-II [JHEP24])
     sre_max_sigma_y: float = 0.3
+    # --- union de tramos colineales de una misma traza (core._unir_colineales)
+    unir_colineales: bool = True
+    union_min_largo: float = 10.0     # px fisicos de cada tramo
+    union_min_cos: float = 0.995      # ~5.7 grados
+    union_max_hueco: float = 20.0     # px fisicos (con binning: al menos 3 columnas)
     usar_energia: bool = True                   # False en imagenes sin calibrar (energia no fisica)
 
 
@@ -324,11 +329,95 @@ def _separar_recta(m, e, amp, p):
     return partes if len(partes) > 1 else None
 
 
+def _recta_de(mask_idx, amp):
+    """(punto medio, direccion, t_min, t_max) en px fisicos si los pixeles forman una recta; si no, None."""
+    ys, xs = mask_idx
+    if len(ys) < 3:
+        return None
+    pts = _pts_fisicos(ys, xs, amp.binx)
+    m = pts.mean(0)
+    u = np.linalg.svd(pts - m, full_matrices=False)[2][0]
+    t = (pts - m) @ u
+    d = np.abs((pts - m) @ np.array([-u[1], u[0]]))
+    if np.percentile(d, 90) >= 3 + amp.binx / 2:
+        return None
+    # con binning, una mancha de pocas columnas mide varios binx px fisicos de ancho y su "recta" sale
+    # horizontal. Una recta de pendiente uy/ux tiene ~binx*|uy/ux| filas por columna (+ su ancho): si la
+    # forma no coincide con la direccion, no es una recta
+    if amp.binx > 1:
+        esperado = amp.binx * abs(u[0]) / max(abs(u[1]), 0.05) + 3
+        if len(ys) / len(np.unique(xs)) > 1.5 * esperado:
+            return None
+    return m, u, t.min(), t.max()
+
+
+def _unir_colineales(out, mapa, e, amp, p):
+    """Une tramos rectos colineales de una misma traza. Un muon largo queda partido cuando cruza una columna
+    enmascarada por la calibracion, cuando su carga baja del umbral en algun pixel o donde lo cruza otra
+    particula; cada tramo tiene solo parte de la energia y los cortos terminaban como electrones.
+    Se unen dos tramos rectos (>= union_min_largo px) casi paralelos (|cos| >= union_min_cos), a menos de
+    3 + binx/2 px de la misma recta y con un hueco <= max(union_max_hueco, 3*binx) px fisicos entre ellos."""
+    idx = {k: np.nonzero(mapa == k + 1) for k in range(len(out))}
+    rectas = {k: r for k, c in enumerate(out) if c.largo >= p.union_min_largo
+              for r in [_recta_de(idx[k], amp)] if r is not None}
+    padre = list(range(len(out)))
+
+    def raiz(k):
+        while padre[k] != k:
+            padre[k] = padre[padre[k]]; k = padre[k]
+        return k
+
+    tol = 3 + amp.binx / 2
+    hueco_max = max(p.union_max_hueco, 3 * amp.binx)
+    malas = [c - amp.x0 for c in amp.columnas_malas]     # columnas enmascaradas, en indices de 'e'
+    ks = sorted(rectas)
+    for i, a in enumerate(ks):
+        ma, ua, ta0, ta1 = rectas[a]
+        for b in ks[i + 1:]:
+            mb, ub, tb0, tb1 = rectas[b]
+            cos = ua @ ub
+            if abs(cos) < p.union_min_cos:
+                continue
+            if abs((mb - ma) @ np.array([-ua[1], ua[0]])) > tol:
+                continue
+            sb = (mb - ma) @ ua
+            lo, hi = sorted((sb + tb0 * cos, sb + tb1 * cos))
+            hueco = max(lo - ta1, ta0 - hi)
+            if hueco < -5:          # se superponen a lo largo de la recta: trazas paralelas, no tramos
+                continue
+            # las columnas enmascaradas que caen en el hueco no cuentan (ahi la carga se borro)
+            s0, s1 = (ta1, lo) if lo > ta1 else (hi, ta0)
+            xa_, xb_ = sorted(((ma + ua * s0)[1] / amp.binx, (ma + ua * s1)[1] / amp.binx))
+            n_malas = sum(1 for c in malas if xa_ - 1 <= c <= xb_ + 1) if hueco > 0 else 0
+            hueco -= n_malas * amp.binx / max(abs(ua[1]), 0.1)
+            if hueco <= hueco_max:
+                padre[raiz(b)] = raiz(a)
+    grupos = {}
+    for k in range(len(out)):
+        grupos.setdefault(raiz(k), []).append(k)
+    if all(len(g) == 1 for g in grupos.values()):
+        return out, mapa
+    nuevo_out, nuevo_mapa = [], np.zeros_like(mapa)
+    for g in sorted(grupos.values(), key=min):
+        ys = np.concatenate([idx[k][0] for k in g]); xs = np.concatenate([idx[k][1] for k in g])
+        if len(g) == 1:
+            c = out[g[0]]
+        else:
+            y0, x0 = ys.min(), xs.min()
+            m = np.zeros((ys.max() - y0 + 1, xs.max() - x0 + 1), bool)
+            m[ys - y0, xs - x0] = True
+            es = np.where(m, e[y0:ys.max() + 1, x0:xs.max() + 1], 0.0)
+            c = _medir(m, es, y0, x0, amp)
+        nuevo_out.append(c)
+        nuevo_mapa[ys, xs] = len(nuevo_out)
+    return nuevo_out, nuevo_mapa
+
+
 def encontrar_clusters(amp: Amp, p: Params = Params(), con_mapa=False):
     """Clusters (una traza cada uno). con_mapa=True devuelve ademas un mapa del tamano de la imagen con
     el numero de cluster (1..n) de cada pixel, 0 = sin traza."""
     e = amp.electrones
-    mapa = np.zeros(e.shape, np.int32) if con_mapa else None
+    mapa = np.zeros(e.shape, np.int32)
     fuerte = e >= p.semilla_e
     debil = e >= p.crecer_e
     # histeresis: componentes de 'debil' que contienen alguna semilla
@@ -361,9 +450,15 @@ def encontrar_clusters(amp: Amp, p: Params = Params(), con_mapa=False):
         for q in pendientes:
             if es[q].sum() >= p.min_energia_e and q.sum() >= p.min_pixeles:
                 out.append(_medir(q, es, sl[0].start, sl[1].start, amp))
-                if mapa is not None:
-                    mapa[sl][q] = len(out)
-    return (out, mapa) if mapa is not None else out
+                mapa[sl][q] = len(out)
+    if p.unir_colineales:
+        # se repite: al unir dos tramos la recta se ajusta mejor y puede alcanzar a un tercero
+        for _ in range(5):
+            n_antes = len(out)
+            out, mapa = _unir_colineales(out, mapa, e, amp, p)
+            if len(out) == n_antes:
+                break
+    return (out, mapa) if con_mapa else out
 
 
 # ----------------------------------------------------------------------------- clasificacion
