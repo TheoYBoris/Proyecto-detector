@@ -42,7 +42,7 @@ estimación de la energía depositada cuando la imagen es un FITS o ROOT calibra
 ├── herramientas/
 │   └── ver_imagenes.py                    visor simple de FITS/ROOT
 ├── datos/                  datos crudos del experimento (no se suben al repositorio)
-└── LICENSE                 licencia MIT
+└── LICENSE                 licencia de uso libre (texto estándar tipo MIT)
 ```
 
 ## Instalación (después de clonar)
@@ -208,10 +208,13 @@ Recomendaciones: subir la imagen cruda en vez de una figura. Si la imagen está 
 
 ## Licencia
 
-El código de este repositorio se distribuye bajo la [licencia MIT](LICENSE).
+© 2026 Theo Del Compare y Santiago Romero. El código se distribuye bajo una licencia permisiva ([LICENSE](LICENSE)):
+se puede usar, copiar, modificar y redistribuir libremente, manteniendo el aviso de copyright y sin garantías.
+Es el texto estándar conocido como "licencia MIT" (el nombre viene de la institución donde se redactó; usarlo
+no implica ninguna relación con ella).
 
 Ojo: el detector usa [Ultralytics YOLO](https://github.com/ultralytics/ultralytics), que tiene licencia
-**AGPL-3.0**. La licencia MIT cubre el código propio. Al redistribuir el conjunto (o los pesos `.pt`
+**AGPL-3.0**. La licencia de este repositorio cubre el código propio. Al redistribuir el conjunto (o los pesos `.pt`
 entrenados con Ultralytics), o al ofrecer el applet como servicio público, rigen además los términos de la
 AGPL-3.0 de Ultralytics, salvo que se tenga una licencia comercial de ellos.
 
