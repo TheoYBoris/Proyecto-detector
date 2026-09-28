@@ -42,12 +42,20 @@ estimación de la energía depositada cuando la imagen es un FITS o ROOT calibra
 ├── herramientas/
 │   └── ver_imagenes.py                    visor simple de FITS/ROOT
 ├── datos/                  datos crudos del experimento (no se suben al repositorio)
+├── INSTALAR.bat            instala el entorno de Python (doble clic, una sola vez)
 └── LICENSE                 licencia de uso libre (texto estándar tipo MIT)
 ```
 
 ## Instalación (después de clonar)
 
-Requiere Python 3.14 y, para usar la GPU, una placa NVIDIA con drivers recientes.
+Requiere [Python 3.14](https://www.python.org/downloads/) (al instalarlo, marcar *Add python.exe to PATH*) y,
+para usar la GPU, una placa NVIDIA con drivers recientes.
+
+**Doble clic en `INSTALAR.bat`.** Crea el entorno de Python (`.venv`) en esta carpeta e instala todo: PyTorch con
+CUDA si hay placa NVIDIA, o la versión para CPU si no. Al final verifica la instalación e indica si se usa la GPU.
+Descarga ~3 GB, ocupa ~5 GB y tarda de 5 a 20 minutos. Si se corta, se puede volver a correr: retoma donde quedó.
+
+El `.venv` no se sube al repositorio: es la instalación de cada PC y se rearma con `INSTALAR.bat`. A mano:
 
 ```powershell
 python -m venv .venv
@@ -55,7 +63,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Sin GPU NVIDIA, instalar `torch` y `torchvision` sin `--index-url`: funciona en CPU, más lento.
+(sin GPU NVIDIA, usar `.../whl/cpu` en lugar de `.../whl/cu126`).
 Los datos crudos del experimento (~1.5 GB) no están en el repositorio. Para reentrenar con ellos hay que
 copiarlos en `datos/201211/` y `datos/proc_corr_proc/`.
 
