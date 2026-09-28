@@ -16,7 +16,7 @@ estimación de la energía depositada cuando la imagen es un FITS o ROOT calibra
 
 ```
 ├── listo_para_usar/        KIT 1: applet + detección con el modelo ya entrenado
-│   ├── modelo/detector_particulas.pt      (entrenado con ~100 000 trazas)
+│   ├── modelo/detector_particulas.pt      (detector actualizado con el run 42)
 │   ├── app.py, iniciar_applet.bat         applet web (Gradio)
 │   ├── detectar.py                        detección por línea de comandos
 │   └── convertir_a_fits.py                ROOT/PNG/JPG/TIFF/PDF → FITS
@@ -123,7 +123,19 @@ y separa las partículas que los cruzan; además la energía de cada traza ya no
 En los 75 archivos de validación (15 554 trazas) coincide con las reglas más que la red sola en todas las
 clases (electrón 79 → 86 %, muón 78 → 80 %, puntual 91 → 98 %, artefacto 85 → 89 %).
 
-## Resultados del modelo entrenado (validación: 300 imágenes no vistas, 15 434 trazas)
+## Resultados del modelo actual: ajuste al run 42
+
+El modelo de `listo_para_usar/` se ajustó durante 10 épocas manteniendo congeladas
+las primeras 10 capas y usando datos anteriores como refuerzo. En la prueba final
+del run 42 (53 FITS, 212 imágenes excluidas del ajuste y de la selección de época),
+el mAP50 pasó de **72,01 % a 74,14 %** y el mAP50-95 de **57,36 % a 61,26 %**.
+En la validación anterior, el mAP50-95 también subió: **57,14 % a 60,99 %**.
+
+Mejoraron muones, electrones, puntuales y artefactos; las alfas siguen sin rendimiento
+útil. Las métricas miden acuerdo con etiquetas automáticas, no identificación física
+confirmada. Ver [procedimiento, comparación por clase y límites](docs/modelo_run42/README.md).
+
+## Resultados históricos del modelo v2 (validación: 300 imágenes, 15 434 trazas)
 
 Modelo v2 (27/09/2026), reentrenado con las reglas que incluyen muones cortos y eventos del registro serie:
 

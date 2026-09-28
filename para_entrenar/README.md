@@ -3,6 +3,11 @@
 Entrena el detector con **tus** imágenes de Skipper-CCD y te deja **tu propio applet** listo para usar.
 No hace falta etiquetar nada a mano: las trazas se etiquetan solas con criterios físicos que podés ajustar.
 
+Esta carpeta contiene el kit para entrenar con datos propios. Los datasets, modelos
+y applets de salida se crean al ejecutar los pasos; no se incluyen experimentos
+anteriores. El flujo principal parte del modelo actualizado de `listo_para_usar/`
+(incluye el ajuste al run 42), o del modelo genérico con `--partir-de base`.
+
 ## En 3 pasos
 
 1. **Copiá tus imágenes** en la carpeta `mis_datos/` (FITS, ROOT, PNG, JPG, TIFF o PDF).

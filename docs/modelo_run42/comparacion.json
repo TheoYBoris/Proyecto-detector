@@ -1,0 +1,415 @@
+{
+  "original": {
+    "val_nuevo": {
+      "metricas": {
+        "metrics/precision(B)": 0.8706725928246717,
+        "metrics/recall(B)": 0.677289723285445,
+        "metrics/mAP50(B)": 0.7130896266816066,
+        "metrics/mAP50-95(B)": 0.5637465968569265,
+        "fitness": 0.5637465968569265
+      },
+      "clases": [
+        {
+          "Class": "muon",
+          "Images": 212,
+          "Instances": 3215,
+          "Box-P": 0.83783,
+          "Box-R": 0.80342,
+          "Box-F1": 0.82027,
+          "mAP50": 0.89642,
+          "mAP75": 0.87175,
+          "mAP50-95": 0.81486
+        },
+        {
+          "Class": "electron",
+          "Images": 212,
+          "Instances": 4764,
+          "Box-P": 0.80306,
+          "Box-R": 0.76679,
+          "Box-F1": 0.78451,
+          "mAP50": 0.84195,
+          "mAP75": 0.75433,
+          "mAP50-95": 0.65987
+        },
+        {
+          "Class": "alfa",
+          "Images": 3,
+          "Instances": 3,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.0,
+          "mAP75": 0.0,
+          "mAP50-95": 0.0
+        },
+        {
+          "Class": "puntual",
+          "Images": 212,
+          "Instances": 2507,
+          "Box-P": 0.82858,
+          "Box-R": 0.91623,
+          "Box-F1": 0.87021,
+          "mAP50": 0.87824,
+          "mAP75": 0.78311,
+          "mAP50-95": 0.63856
+        },
+        {
+          "Class": "artefacto",
+          "Images": 203,
+          "Instances": 630,
+          "Box-P": 0.88389,
+          "Box-R": 0.9,
+          "Box-F1": 0.89187,
+          "mAP50": 0.94883,
+          "mAP75": 0.8745,
+          "mAP50-95": 0.70545
+        }
+      ],
+      "imagenes": 212
+    },
+    "val_anterior": {
+      "metricas": {
+        "metrics/precision(B)": 0.8742064363668668,
+        "metrics/recall(B)": 0.6812250253420894,
+        "metrics/mAP50(B)": 0.718980600479839,
+        "metrics/mAP50-95(B)": 0.5713797898034535,
+        "fitness": 0.5713797898034535
+      },
+      "clases": [
+        {
+          "Class": "muon",
+          "Images": 300,
+          "Instances": 4310,
+          "Box-P": 0.83065,
+          "Box-R": 0.81601,
+          "Box-F1": 0.82326,
+          "mAP50": 0.9023,
+          "mAP75": 0.88256,
+          "mAP50-95": 0.8231
+        },
+        {
+          "Class": "electron",
+          "Images": 300,
+          "Instances": 6787,
+          "Box-P": 0.82791,
+          "Box-R": 0.7755,
+          "Box-F1": 0.80085,
+          "mAP50": 0.85663,
+          "mAP75": 0.77679,
+          "mAP50-95": 0.68123
+        },
+        {
+          "Class": "alfa",
+          "Images": 9,
+          "Instances": 9,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.00928,
+          "mAP75": 0.00331,
+          "mAP50-95": 0.00319
+        },
+        {
+          "Class": "puntual",
+          "Images": 300,
+          "Instances": 3462,
+          "Box-P": 0.83303,
+          "Box-R": 0.92317,
+          "Box-F1": 0.87579,
+          "mAP50": 0.88434,
+          "mAP75": 0.78876,
+          "mAP50-95": 0.64529
+        },
+        {
+          "Class": "artefacto",
+          "Images": 286,
+          "Instances": 866,
+          "Box-P": 0.87944,
+          "Box-R": 0.89145,
+          "Box-F1": 0.88541,
+          "mAP50": 0.94236,
+          "mAP75": 0.87337,
+          "mAP50-95": 0.70409
+        }
+      ],
+      "imagenes": 300
+    }
+  },
+  "adaptado": {
+    "val_nuevo": {
+      "metricas": {
+        "metrics/precision(B)": 0.8887062586401153,
+        "metrics/recall(B)": 0.6933985031202385,
+        "metrics/mAP50(B)": 0.7337830744329914,
+        "metrics/mAP50-95(B)": 0.6029707243769661,
+        "fitness": 0.6029707243769661
+      },
+      "clases": [
+        {
+          "Class": "muon",
+          "Images": 212,
+          "Instances": 3215,
+          "Box-P": 0.85822,
+          "Box-R": 0.81525,
+          "Box-F1": 0.83618,
+          "mAP50": 0.9132,
+          "mAP75": 0.88778,
+          "mAP50-95": 0.83728
+        },
+        {
+          "Class": "electron",
+          "Images": 212,
+          "Instances": 4764,
+          "Box-P": 0.80811,
+          "Box-R": 0.82125,
+          "Box-F1": 0.81463,
+          "mAP50": 0.87269,
+          "mAP75": 0.79312,
+          "mAP50-95": 0.70351
+        },
+        {
+          "Class": "alfa",
+          "Images": 3,
+          "Instances": 3,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.00345,
+          "mAP75": 0.00345,
+          "mAP50-95": 0.0025
+        },
+        {
+          "Class": "puntual",
+          "Images": 212,
+          "Instances": 2507,
+          "Box-P": 0.88772,
+          "Box-R": 0.91145,
+          "Box-F1": 0.89943,
+          "mAP50": 0.92135,
+          "mAP75": 0.83571,
+          "mAP50-95": 0.70925
+        },
+        {
+          "Class": "artefacto",
+          "Images": 203,
+          "Instances": 630,
+          "Box-P": 0.88948,
+          "Box-R": 0.91905,
+          "Box-F1": 0.90402,
+          "mAP50": 0.95823,
+          "mAP75": 0.90463,
+          "mAP50-95": 0.76231
+        }
+      ],
+      "imagenes": 212
+    },
+    "val_anterior": {
+      "metricas": {
+        "metrics/precision(B)": 0.8925454255330031,
+        "metrics/recall(B)": 0.6948718978509502,
+        "metrics/mAP50(B)": 0.7389603025067776,
+        "metrics/mAP50-95(B)": 0.6099388069523018,
+        "fitness": 0.6099388069523018
+      },
+      "clases": [
+        {
+          "Class": "muon",
+          "Images": 300,
+          "Instances": 4310,
+          "Box-P": 0.84756,
+          "Box-R": 0.8256,
+          "Box-F1": 0.83644,
+          "mAP50": 0.91427,
+          "mAP75": 0.89629,
+          "mAP50-95": 0.84416
+        },
+        {
+          "Class": "electron",
+          "Images": 300,
+          "Instances": 6787,
+          "Box-P": 0.83089,
+          "Box-R": 0.82201,
+          "Box-F1": 0.82643,
+          "mAP50": 0.88555,
+          "mAP75": 0.81092,
+          "mAP50-95": 0.72477
+        },
+        {
+          "Class": "alfa",
+          "Images": 9,
+          "Instances": 9,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.01256,
+          "mAP75": 0.01256,
+          "mAP50-95": 0.00955
+        },
+        {
+          "Class": "puntual",
+          "Images": 300,
+          "Instances": 3462,
+          "Box-P": 0.89108,
+          "Box-R": 0.91797,
+          "Box-F1": 0.90432,
+          "mAP50": 0.929,
+          "mAP75": 0.84618,
+          "mAP50-95": 0.71894
+        },
+        {
+          "Class": "artefacto",
+          "Images": 286,
+          "Instances": 866,
+          "Box-P": 0.89319,
+          "Box-R": 0.90878,
+          "Box-F1": 0.90092,
+          "mAP50": 0.95342,
+          "mAP75": 0.88717,
+          "mAP50-95": 0.75227
+        }
+      ],
+      "imagenes": 300
+    }
+  },
+  "original_test": {
+    "test_nuevo": {
+      "metricas": {
+        "metrics/precision(B)": 0.8899536843126903,
+        "metrics/recall(B)": 0.6713515624958329,
+        "metrics/mAP50(B)": 0.7200685113611426,
+        "metrics/mAP50-95(B)": 0.5736197422554778,
+        "fitness": 0.5736197422554778
+      },
+      "clases": [
+        {
+          "Class": "muon",
+          "Images": 212,
+          "Instances": 2954,
+          "Box-P": 0.86008,
+          "Box-R": 0.79283,
+          "Box-F1": 0.82509,
+          "mAP50": 0.89716,
+          "mAP75": 0.87415,
+          "mAP50-95": 0.81798
+        },
+        {
+          "Class": "electron",
+          "Images": 212,
+          "Instances": 4651,
+          "Box-P": 0.84411,
+          "Box-R": 0.75092,
+          "Box-F1": 0.79479,
+          "mAP50": 0.84973,
+          "mAP75": 0.77099,
+          "mAP50-95": 0.67493
+        },
+        {
+          "Class": "alfa",
+          "Images": 5,
+          "Instances": 5,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.01116,
+          "mAP75": 0.01116,
+          "mAP50-95": 0.00677
+        },
+        {
+          "Class": "puntual",
+          "Images": 212,
+          "Instances": 2437,
+          "Box-P": 0.83874,
+          "Box-R": 0.92532,
+          "Box-F1": 0.8799,
+          "mAP50": 0.88774,
+          "mAP75": 0.79579,
+          "mAP50-95": 0.65189
+        },
+        {
+          "Class": "artefacto",
+          "Images": 203,
+          "Instances": 636,
+          "Box-P": 0.90684,
+          "Box-R": 0.88768,
+          "Box-F1": 0.89716,
+          "mAP50": 0.95456,
+          "mAP75": 0.87777,
+          "mAP50-95": 0.71652
+        }
+      ],
+      "imagenes": 212
+    }
+  },
+  "adaptado_test": {
+    "test_nuevo": {
+      "metricas": {
+        "metrics/precision(B)": 0.902933305179285,
+        "metrics/recall(B)": 0.692728913443599,
+        "metrics/mAP50(B)": 0.7414488515957429,
+        "metrics/mAP50-95(B)": 0.6125559589169783,
+        "fitness": 0.6125559589169783
+      },
+      "clases": [
+        {
+          "Class": "muon",
+          "Images": 212,
+          "Instances": 2954,
+          "Box-P": 0.86384,
+          "Box-R": 0.81584,
+          "Box-F1": 0.83916,
+          "mAP50": 0.91178,
+          "mAP75": 0.88918,
+          "mAP50-95": 0.84108
+        },
+        {
+          "Class": "electron",
+          "Images": 212,
+          "Instances": 4651,
+          "Box-P": 0.83898,
+          "Box-R": 0.81853,
+          "Box-F1": 0.82863,
+          "mAP50": 0.88447,
+          "mAP75": 0.81077,
+          "mAP50-95": 0.7219
+        },
+        {
+          "Class": "alfa",
+          "Images": 5,
+          "Instances": 5,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.00466,
+          "mAP75": 0.00162,
+          "mAP50-95": 0.00258
+        },
+        {
+          "Class": "puntual",
+          "Images": 212,
+          "Instances": 2437,
+          "Box-P": 0.89947,
+          "Box-R": 0.92204,
+          "Box-F1": 0.91061,
+          "mAP50": 0.93671,
+          "mAP75": 0.85449,
+          "mAP50-95": 0.72742
+        },
+        {
+          "Class": "artefacto",
+          "Images": 203,
+          "Instances": 636,
+          "Box-P": 0.91238,
+          "Box-R": 0.90723,
+          "Box-F1": 0.9098,
+          "mAP50": 0.96961,
+          "mAP75": 0.8985,
+          "mAP50-95": 0.76979
+        }
+      ],
+      "imagenes": 212
+    }
+  },
+  "max_cambio_backbone": 0.0,
+  "original_intacto": true,
+  "best_sha256": "fe28e2fa1d6a2fbb9cad3016c488a0e96c873a5ece3fe8e02f40563ff8317f1f"
+}

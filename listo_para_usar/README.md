@@ -3,6 +3,11 @@
 Identifica partículas en imágenes de Skipper-CCD con el **modelo ya entrenado**
 (`modelo/detector_particulas.pt`). No hace falta entrenar nada.
 
+El modelo incluido incorpora el ajuste al **run 42**. En la prueba final reservada,
+el mAP50-95 pasó de 57,36 % a 61,26 %; también mejoró en la validación anterior.
+La mejora se mide contra etiquetas automáticas y las alfas siguen siendo una
+debilidad. Ver [evaluación y límites del modelo](../docs/modelo_run42/README.md).
+
 ## Applet web
 
 Doble clic en `iniciar_applet.bat`. El navegador se abre solo cuando el applet está listo (unos 5 s); para

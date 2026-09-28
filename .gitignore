@@ -45,5 +45,7 @@ convertidos/
 # Varios
 .Rhistory
 .gradio/
+.ultralytics/
+Ultralytics/
 .DS_Store
 Thumbs.db
